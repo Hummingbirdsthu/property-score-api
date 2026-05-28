@@ -1,19 +1,3 @@
-"""
-Tính điểm thương mại (commercial score) cho một địa điểm dựa trên JSON đầu vào.
-
-Công thức: score = Σ (K_i × W_i)
-
-Các nhóm feature:
-  - road_type   : loại đường       (W = 0.25)
-  - road_width  : bề rộng đường    (W = 0.20)
-  - poi_density : mật độ POI       (W = 0.15)
-  - amenity     : số nhóm tiện ích (W = 0.10)
-  - sidewalk    : vỉa hè           (W = 0.10)
-
-Tổng W = 0.80 → nếu muốn normalize về [0, 1] thì chia cho 0.80,
-hoặc giữ nguyên nếu bảng chỉ dùng 5 feature này.
-"""
-
 from __future__ import annotations
 from typing import Union, Optional
 
