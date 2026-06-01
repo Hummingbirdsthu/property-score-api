@@ -611,35 +611,22 @@ def calculate_P_by_f_score(data: dict) -> dict:
     target = flatten(data["target_asset"])
     f_target = calculate_f_score(target)
 
-    results = []
+    data["target_asset"]["f_tsmt"] = round(f_target, 4)
 
-    for asset in data["comparable_assets"]:
+    for i, asset in enumerate(data["comparable_assets"]):
         comp = flatten(asset)
         f_comp = calculate_f_score(comp)
 
-        # tránh chia 0
-        if f_comp == 0:
-            p = None
-        else:
-            p = comp.get("price") * f_target * target.get("area") / (f_comp * comp.get("area"))
+        p = (
+            comp.get("price") * f_target * target.get("area") / (f_comp * comp.get("area"))
+            if f_comp != 0 else None
+        )
 
-        results.append({
-            "asset_id": comp.get("asset_id"),
-            "price": comp.get("price"),
-            "f_score": round(f_comp, 4),
-            "P_tsmt": round(p) if p else None,
-            #"k*W": f_target['breakdown']
-        })
+        # Thêm trực tiếp vào asset gốc
+        data["comparable_assets"][i]["f_tsss"] = round(f_comp, 4)
+        data["comparable_assets"][i]["P_tsmt"] = round(p) if p is not None else None
 
-    return {
-        "target_asset": {
-            "asset_id": target.get("asset_id"),
-            "f_score": round(f_target, 4),
-            #"k*W": f_comp['breakdown']
-        },
-
-        "comparable_assets": results
-    }
+    return data
 
 # ---------------------------------------------------------------------------
 # flatten json -> dict
