@@ -140,7 +140,6 @@ def grade(cs: float) -> tuple[str, str]:
     else:
         return "E", "Không khuyến nghị"
 
-
 # ---------------------------------------------------------------------------
 # 8. Warning Engine
 # ---------------------------------------------------------------------------
@@ -236,6 +235,7 @@ def calculate_confidence(data: dict) -> dict:
 
     # --- Gắn kết quả vào data gốc ---
     confidence = {
+        "asset_id": data.get("target_asset", {}).get("asset_id"),
         "overall_score": round(cs, 2),
         "grade": cs_grade,
         "meaning": cs_meaning,
