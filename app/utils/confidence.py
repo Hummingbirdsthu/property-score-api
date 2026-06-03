@@ -1,12 +1,9 @@
 """
 Tính độ tin cậy (Confidence Score) cho kết quả định giá AVM.
-Đầu vào: JSON output của calculate_P_by_f_score(sample)
+Đầu vào: JSON 
 """
 
 from datetime import datetime, date
-from typing import Optional
-from ppss import calculate_P_by_f_score
-
 
 # ---------------------------------------------------------------------------
 # 1. Số lượng TSSS hợp lệ
@@ -104,11 +101,10 @@ def score_bien_gia(spread_pct: float) -> int:
 
 def calc_spread(p_list: list[float]) -> float:
     """Tính spread (%) từ danh sách giá."""
-    valid = [p for p in p_list if p is not None]
-    if len(valid) == 1:
-        return valid
-    pmax, pmin, pavg = max(valid), min(valid), sum(valid) / len(valid)
-    return (pmax - pmin) / pavg * 100 if pavg else 0
+    if len(p_list) == 0:
+        return 1
+    pmax, pmin, pavg = max(p_list), min(p_list), sum(p_list) / len(p_list)
+    return (pmax - pmin) / pavg * 100# if pavg else 0
 
 
 # ---------------------------------------------------------------------------
@@ -185,7 +181,7 @@ def calculate_confidence(data: dict) -> dict:
     Đầu vào: output của calculate_P_by_f_score(sample) — đã có f_tsmt, f_tsss, P_tsmt.
 
     Mỗi asset trong comparable_assets cần có thêm:
-        - distance_m       : khoảng cách tới TSMT (mét)
+        - DistanceM       : khoảng cách tới TSMT (mét)
         - transaction_date : ngày giao dịch (str ISO hoặc date)
         - data_source      : nguồn dữ liệu (xem SOURCE_SCORE)
 
@@ -193,13 +189,13 @@ def calculate_confidence(data: dict) -> dict:
     """
     comps = data.get("comparable_assets", [])
     n = len(comps)
-    comps_with_dist = [c for c in comps if c.get("distance_m") is not None]
+    comps_with_dist = [c for c in comps if c.get("DistanceM") is not None]#["Comparable_Distances"][0]
     
     # 1. Số lượng
     k_so_luong = score_so_luong(n)
 
     # 2. khoang cach
-    avg_dist = sum(c["distance_m"] for c in comps_with_dist) / len(comps_with_dist)
+    avg_dist = sum(c["DistanceM"] for c in comps_with_dist) / len(comps_with_dist)#["Comparable_Distances"][0]
     k_khoang_cach = score_khoang_cach(avg_dist)
 
     # 3. Thời gian trung bình 
@@ -219,8 +215,8 @@ def calculate_confidence(data: dict) -> dict:
             source_scores.append(score_nguon(src))
     k_nguon = round(sum(source_scores) / len(source_scores)) if source_scores else 85
 
-    # 5. Biên giá từ P_tsmt
-    p_list = [c.get("P_tsmt") for c in comps]
+    # 5. Biên giá từ price cua tsss
+    p_list = [c.get("price")/c.get("area") for c in comps]
     spread = calc_spread(p_list)
     k_bien_gia = score_bien_gia(spread)
 
@@ -259,108 +255,106 @@ def calculate_confidence(data: dict) -> dict:
 # Demo / quick-test
 # ---------------------------------------------------------------------------
 
-# if __name__ == "__main__":
-#     import json
-#     sample_output = {
-#     "target_asset": {
-#         "asset_id": "TSMT_001",
-#         "property_type": "Nhà riêng",
-#         #"price": null,
-#         "area": 74,
-#         "road_width": 4,
-#         "length": 18,
-#         "legal": "sổ đỏ/sổ hồng",
-#         "address": "Chu Văn An, P12, Bình Thạnh",
-#         "ward": "Phường 12",
-#         "district": "Bình Thạnh",
-#         "city": "Hồ Chí Minh",
-#         "lat": 10.81095064,
-#         "lng": 106.701879,
-#         "alley_width": 6,
-#         "alley_level": 1,
-#         "alley_type": "thông",
-#         "floors": 2,
-#         # "house_direction": null,
-#         # "features": {
-#         #   "is_corner": false,
-#         #   "is_wide_alley": true,
-#         #   "is_full_furniture": true,
-#         #   "is_new_house": true,
-#         #   "is_business_good": true
-#         # },
-#         "nearby": {
-#         "school": 167,
-#         "hospital": 781,
-#         "market": 711,
-#         "airport": 5107,
-#         "railway": 1959,
-#         "landfill": 2204,
-#         "pagoda": 582
-#         },
-#         "note": "Hẻm ô tô - 74m2 - nhà mới full nội thất"
-#     },
-#     "comparable_assets": [
-#         {
-#         "asset_id": "TSSS_001",
-#         "price": 18000000000,
-#         "area": 330,
-#         "address": "Chu Văn An, P12",
-#         "lat": 10.81078753,
-#         "lng": 106.7019831,
-#         "nearby": {
-#             "school": 180.8,
-#             "hospital": 792.5,
-#         "market": 724,
-#             "airport": 5121.4,
-#             "railway": 1975.2,
-#             "landfill": 2200.2,
-#             "pagoda": 594.2
-#         },
-#         "distance_m": 375,
-#         "note": "Nhà chính chủ cần bán gấp"
-#         },
-#         {
-#         "asset_id": "TSSS_002",
-#         "price": 6200000000,
-#         "area": 36,
-#         "address": "Chu Văn An, P12",
-#         "lat": 10.81069242,
-#         "lng": 106.7017343,
-#         "nearby": {
-#             "school": 199.5,
-#             "hospital": 765.6,
-#             "market": 697.6,
-#             "airport": 5096.3,
-#             "railway": 1952.3,
-#             "landfill": 2229.4,
-#             "pagoda": 567.6
-#         },
-#         "distance_m": 365.23009145,
-#         "note": "Nhà mới 2 tầng - nở hậu"
-#         },
-#         {
-#         "asset_id": "TSSS_003",
-#         "price": 9700000000,
-#         "area": 74,
-#         "address": "Chu Văn An, P12",
-#         "lat": 10.81095064,
-#         "lng": 106.701879,
-#         "nearby": {
-#             "school": 167,
-#             "hospital": 781.1,
-#             "market": 711.7,
-#             "airport": 5107.3,
-#             "railway": 1959.2,
-#             "landfill": 2204.9,
-#             "pagoda": 582.1
-#         },
-#         "distance_m": 344.02104631,
-#         "note": "Hẻm ô tô - nhà mới full nội thất"
-#         }
-#     ]
-#     }
+if __name__ == "__main__":
+    import json
+    sample_output = {
+    "target_asset": {
+        "asset_id": "TSMT_001",
+        "property_type": "Nhà riêng",
+        #"price": null,
+        "area": 74,
+        "road_width": 4,
+        "length": 18,
+        "legal": "sổ đỏ/sổ hồng",
+        "address": "Chu Văn An, P12, Bình Thạnh",
+        "ward": "Phường 12",
+        "district": "Bình Thạnh",
+        "city": "Hồ Chí Minh",
+        "lat": 10.81095064,
+        "lng": 106.701879,
+        "alley_width": 6,
+        "alley_level": 1,
+        "alley_type": "thông",
+        "floors": 2,
+        # "house_direction": null,
+        # "features": {
+        #   "is_corner": false,
+        #   "is_wide_alley": true,
+        #   "is_full_furniture": true,
+        #   "is_new_house": true,
+        #   "is_business_good": true
+        # },
+        "nearby": {
+        "school": 167,
+        "hospital": 781,
+        "market": 711,
+        "airport": 5107,
+        "railway": 1959,
+        "landfill": 2204,
+        "pagoda": 582
+        },
+        "note": "Hẻm ô tô - 74m2 - nhà mới full nội thất"
+    },
+    "comparable_assets": [
+        {
+        "asset_id": "TSSS_001",
+        "price": 18000000000,
+        "area": 330,
+        "address": "Chu Văn An, P12",
+        "lat": 10.81078753,
+        "lng": 106.7019831,
+        "nearby": {
+            "school": 180.8,
+            "hospital": 792.5,
+            "market": 724,
+            "airport": 5121.4,
+            "railway": 1975.2,
+            "landfill": 2200.2,
+            "pagoda": 594.2
+        },
+        "DistanceM": 375,
+        "note": "Nhà chính chủ cần bán gấp"
+        },
+        {
+        "asset_id": "TSSS_002",
+        "price": 6200000000,
+        "area": 36,
+        "address": "Chu Văn An, P12",
+        "lat": 10.81069242,
+        "lng": 106.7017343,
+        "nearby": {
+            "school": 199.5,
+            "hospital": 765.6,
+            "market": 697.6,
+            "airport": 5096.3,
+            "railway": 1952.3,
+            "landfill": 2229.4,
+            "pagoda": 567.6
+        },
+        "DistanceM": 365.23009145,
+        "note": "Nhà mới 2 tầng - nở hậu"
+        },
+        {
+        "asset_id": "TSSS_003",
+        "price": 9700000000,
+        "area": 74,
+        "address": "Chu Văn An, P12",
+        "lat": 10.81095064,
+        "lng": 106.701879,
+        "nearby": {
+            "school": 167,
+            "hospital": 781.1,
+            "market": 711.7,
+            "airport": 5107.3,
+            "railway": 1959.2,
+            "landfill": 2204.9,
+            "pagoda": 582.1
+        },
+        "DistanceM": 344.02104631,
+        "note": "Hẻm ô tô - nhà mới full nội thất"
+        }
+    ]
+    }
 
-#     sample_output = calculate_P_by_f_score(sample_output)
-#     print(json.dumps(sample_output, ensure_ascii=False, indent=2))
-#     result = calculate_confidence(sample_output)
-#     print(json.dumps(result, ensure_ascii=False, indent=2))
+    result = calculate_confidence(sample_output)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
