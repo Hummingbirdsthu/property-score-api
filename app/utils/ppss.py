@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Union, Optional
+import statistics
 
 
 # ---------------------------------------------------------------------------
@@ -652,6 +653,32 @@ def flatten(asset: dict) -> dict:
             result[k] = v
 
     return result
+
+# ---------------------------------------------------------------------------
+# Benchmark
+# ---------------------------------------------------------------------------
+
+def calculate_benchmark(data: dict) -> dict:
+    """
+    Đầu vào: output của calculate_P_by_f_score (đã có P_tsmt trong comparable_assets).
+
+    Trả về data gốc được bổ sung key "benchmark".
+    """
+    comps = data.get("comparable_assets", [])
+    p_list = [c["P_tsmt"] for c in comps if c.get("P_tsmt") is not None]
+    p_min   = min(p_list)
+    p_max   = max(p_list)
+
+    data["benchmark"] = {
+        "average":          round(sum(p_list) / len(p_list)),
+        "median":           round(statistics.median(p_list)),
+        "min":              p_min,
+        "max":              p_max,
+        "range":            p_max - p_min,
+        "n_samples":        len(p_list),
+        #"comparable_assets": detail,
+    }
+    return data
 
 # ---------------------------------------------------------------------------
 # Demo
