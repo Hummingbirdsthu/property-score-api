@@ -664,6 +664,7 @@ def calculate_benchmark(data: dict) -> dict:
 
     Trả về data gốc được bổ sung key "benchmark".
     """
+    data = calculate_P_by_f_score(data)
     comps = data.get("comparable_assets", [])
     p_list = [c["P_tsmt"] for c in comps if c.get("P_tsmt") is not None]
     p_min   = min(p_list)
