@@ -257,158 +257,158 @@ def calculate_confidence(data: dict) -> dict:
     return data
 
 
-if __name__ == "__main__":
-    import json
+# if __name__ == "__main__":
+#     import json
 
-    sample = {
-    "PropertyId": "TSMT",
-    "PropertyType": "Nha_o",
-    #"CollateralFlag": false,
-    "OwnershipPercentage": 0,
-    "DisputeFlag": "Khong_tranh_chap",
-    #"MortgageFlag": false,
-    "LandAreaTotal": 50,
-    "LandUsePurpose": "ODT___t______th_",
-    "RoadAccessType": "M_t_ti_n",
-    "FrontageWidth": 50,
-    "RoadWidth": 10,
-    #"AlleyFlag": false,
-    "Version": 0,
-    "Tax_Obligations": "___n_p",
-    "Planning": "Kh_ng_quy_ho_ch",
-    "frontage_count": 1,
-    "distance_to_main_road": 10,
-    "Construction_Area": 50,
-    #"Property_On_land": false,
-    "structure_type": "B__t_ng_c_t_th_p",
+#     sample = {
+#     "PropertyId": "TSMT",
+#     "PropertyType": "Nha_o",
+#     #"CollateralFlag": false,
+#     "OwnershipPercentage": 0,
+#     "DisputeFlag": "Khong_tranh_chap",
+#     #"MortgageFlag": false,
+#     "LandAreaTotal": 50,
+#     "LandUsePurpose": "ODT___t______th_",
+#     "RoadAccessType": "M_t_ti_n",
+#     "FrontageWidth": 50,
+#     "RoadWidth": 10,
+#     #"AlleyFlag": false,
+#     "Version": 0,
+#     "Tax_Obligations": "___n_p",
+#     "Planning": "Kh_ng_quy_ho_ch",
+#     "frontage_count": 1,
+#     "distance_to_main_road": 10,
+#     "Construction_Area": 50,
+#     #"Property_On_land": false,
+#     "structure_type": "B__t_ng_c_t_th_p",
 
-    "PropertyLocation": {
-        "HouseNumber": "",
-        "Street": "Đường Nguyễn Thượng Hiền",
-        "Ward": "Phường 6",
-        "District": "Quận Bình Thạnh",
-        "Province": "Hồ Chí Minh",
-        "Latitude": 10.80560109,
-        "Longitude": 106.68607077,
-        "LocationScore": 0
-    },
+#     "PropertyLocation": {
+#         "HouseNumber": "",
+#         "Street": "Đường Nguyễn Thượng Hiền",
+#         "Ward": "Phường 6",
+#         "District": "Quận Bình Thạnh",
+#         "Province": "Hồ Chí Minh",
+#         "Latitude": 10.80560109,
+#         "Longitude": 106.68607077,
+#         "LocationScore": 0
+#     },
 
-    "Comparable_Assets": [
-        {
-        "Comparable_id": "117.49254466",
-        "property_type": "Nhà mặt phố",
-        "address": "Đường Nguyễn Thượng Hiền, Phường 6, Quận Bình Thạnh, Hồ Chí Minh",
-        "ward": "Phường 6",
-        "district": "Quận Bình Thạnh",
-        "province": "Hồ Chí Minh",
-        "Latitude": 10.80833966,
-        "longtitude": 106.684205,
-        "Note": "Bán nhanh trong tháng chỉ 16tỷ9 ngay mặt tiền doanh thu 90tr/tháng",
+#     "Comparable_Assets": [
+#         {
+#         "Comparable_id": "117.49254466",
+#         "property_type": "Nhà mặt phố",
+#         "address": "Đường Nguyễn Thượng Hiền, Phường 6, Quận Bình Thạnh, Hồ Chí Minh",
+#         "ward": "Phường 6",
+#         "district": "Quận Bình Thạnh",
+#         "province": "Hồ Chí Minh",
+#         "Latitude": 10.80833966,
+#         "longtitude": 106.684205,
+#         "Note": "Bán nhanh trong tháng chỉ 16tỷ9 ngay mặt tiền doanh thu 90tr/tháng",
 
-        "Comparable_Property_Detail": {
-            "Land_Area": 900,
-            "Building_Area": 0,
-            "Frontage": 0,
-            "Road_width": 0,
-            "Floor_Count": 30,
-            "Construction_year": 0,
-            "Legal_status": "sổ đỏ/sổ hồng"
-        },
+#         "Comparable_Property_Detail": {
+#             "Land_Area": 900,
+#             "Building_Area": 0,
+#             "Frontage": 0,
+#             "Road_width": 0,
+#             "Floor_Count": 30,
+#             "Construction_year": 0,
+#             "Legal_status": "sổ đỏ/sổ hồng"
+#         },
 
-        "Comparable_Transaction": {
-            "Transaction_Price": 16900000000000000,
-            "Listing_Price": 0,
-            "Price_Per_m2": 0,
-            "Transaction_Date": "2026-05-04T17:00:00.000Z",
-            "Distance_To_Subject": 0
-        },
+#         "Comparable_Transaction": {
+#             "Transaction_Price": 16900000000000000,
+#             "Listing_Price": 0,
+#             "Price_Per_m2": 0,
+#             "Transaction_Date": "2026-05-04T17:00:00.000Z",
+#             "Distance_To_Subject": 0
+#         },
 
-        "Advantages": {
-            "Nearest_School": 191,
-            "Nearest_Hospital": 462.4,
-            "Nearest_Market": 144.8,
-            "Nearest_cemetery": 730.2,
-            "Nearest_Airport": 3297.1,
-            "Nearest_Railway": 839.8,
-            "Nearest_landfill": 4140.6,
-            "Nearest_Pagoda": 158.9
-        },
+#         "Advantages": {
+#             "Nearest_School": 191,
+#             "Nearest_Hospital": 462.4,
+#             "Nearest_Market": 144.8,
+#             "Nearest_cemetery": 730.2,
+#             "Nearest_Airport": 3297.1,
+#             "Nearest_Railway": 839.8,
+#             "Nearest_landfill": 4140.6,
+#             "Nearest_Pagoda": 158.9
+#         },
 
-        "Comparable_Distances": [
-            {
-            "DistanceM": 365.23009145
-            }
-        ]
-        },
+#         "Comparable_Distances": [
+#             {
+#             "DistanceM": 365.23009145
+#             }
+#         ]
+#         },
 
-        {
-        "Comparable_id": "117.49252595",
-        "property_type": "Nhà mặt phố",
-        "address": "Đường Nguyễn Thượng Hiền, Phường 5, Quận Phú Nhuận, Hồ Chí Minh",
-        "ward": "Phường 5",
-        "district": "Quận Phú Nhuận",
-        "province": "Hồ Chí Minh",
-        "Latitude": 10.80819335,
-        "longtitude": 106.6843326,
-        "Note": "Thu nhập 400 triệu - 105 tỷ! Bán tòa nhà 1946m2 Nguyễn Thượng Hiền, Bình Thạnh - Hầm 9 Tầng",
+#         {
+#         "Comparable_id": "117.49252595",
+#         "property_type": "Nhà mặt phố",
+#         "address": "Đường Nguyễn Thượng Hiền, Phường 5, Quận Phú Nhuận, Hồ Chí Minh",
+#         "ward": "Phường 5",
+#         "district": "Quận Phú Nhuận",
+#         "province": "Hồ Chí Minh",
+#         "Latitude": 10.80819335,
+#         "longtitude": 106.6843326,
+#         "Note": "Thu nhập 400 triệu - 105 tỷ! Bán tòa nhà 1946m2 Nguyễn Thượng Hiền, Bình Thạnh - Hầm 9 Tầng",
 
-        "Comparable_Property_Detail": {
-            "Land_Area": 28517,
-            "Building_Area": 0,
-            "Frontage": 124,
-            "Road_width": 0,
-            "Floor_Count": 80,
-            "Construction_year": 0,
-            "Legal_status": "sổ đỏ/sổ hồng"
-        },
+#         "Comparable_Property_Detail": {
+#             "Land_Area": 28517,
+#             "Building_Area": 0,
+#             "Frontage": 124,
+#             "Road_width": 0,
+#             "Floor_Count": 80,
+#             "Construction_year": 0,
+#             "Legal_status": "sổ đỏ/sổ hồng"
+#         },
 
-        "Comparable_Transaction": {
-            "Transaction_Price": 1050000000000,
-            "Listing_Price": 0,
-            "Price_Per_m2": 0,
-            "Transaction_Date": "2026-05-08T17:00:00.000Z",
-            "Distance_To_Subject": 0
-        },
+#         "Comparable_Transaction": {
+#             "Transaction_Price": 1050000000000,
+#             "Listing_Price": 0,
+#             "Price_Per_m2": 0,
+#             "Transaction_Date": "2026-05-08T17:00:00.000Z",
+#             "Distance_To_Subject": 0
+#         },
 
-        "Advantages": {
-            "Nearest_School": 172.2,
-            "Nearest_Hospital": 441,
-            "Nearest_Market": 153.6,
-            "Nearest_cemetery": 751.6,
-            "Nearest_Airport": 3315.7,
-            "Nearest_Railway": 855.3,
-            "Nearest_landfill": 4131.2,
-            "Nearest_Pagoda": 150.8
-        },
+#         "Advantages": {
+#             "Nearest_School": 172.2,
+#             "Nearest_Hospital": 441,
+#             "Nearest_Market": 153.6,
+#             "Nearest_cemetery": 751.6,
+#             "Nearest_Airport": 3315.7,
+#             "Nearest_Railway": 855.3,
+#             "Nearest_landfill": 4131.2,
+#             "Nearest_Pagoda": 150.8
+#         },
 
-        "Comparable_Distances": [
-            {
-            "DistanceM": 344.02104631
-            }
-        ]
-        }
-    ],
+#         "Comparable_Distances": [
+#             {
+#             "DistanceM": 344.02104631
+#             }
+#         ]
+#         }
+#     ],
 
-    "Legal_Certificate": {
-        "Certificate_Serial": "po09839582",
-        "Issue_Date": "2026-04-30T17:00:00.000Z",
-        "Certificate_type": "So_do"
-    },
+#     "Legal_Certificate": {
+#         "Certificate_Serial": "po09839582",
+#         "Issue_Date": "2026-04-30T17:00:00.000Z",
+#         "Certificate_type": "So_do"
+#     },
 
-    "Advantages": {
-        "Nearest_School": 43.7,
-        "Nearest_Hospital": 100.4,
-        "Nearest_Market": 380.8,
-        "Nearest_Airport": 3597.1,
-        "Nearest_Railway": 1153.2,
-        "Nearest_landfill": 4033.1,
-        "Nearest_Pagoda": 212.3
-    }
-    }
-    #target = flatten_external_target(sample)
-    result = calculate_confidence(sample)
-    print("Input:", json.dumps(sample, ensure_ascii=False, indent=2))
-    print("\nOutput:")
-    #print(result)
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+#     "Advantages": {
+#         "Nearest_School": 43.7,
+#         "Nearest_Hospital": 100.4,
+#         "Nearest_Market": 380.8,
+#         "Nearest_Airport": 3597.1,
+#         "Nearest_Railway": 1153.2,
+#         "Nearest_landfill": 4033.1,
+#         "Nearest_Pagoda": 212.3
+#     }
+#     }
+#     #target = flatten_external_target(sample)
+#     result = calculate_confidence(sample)
+#     print("Input:", json.dumps(sample, ensure_ascii=False, indent=2))
+#     print("\nOutput:")
+#     #print(result)
+#     print(json.dumps(result, ensure_ascii=False, indent=2))
 
