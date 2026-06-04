@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from typing import Any, Dict
 from app.services.ppss_service import (
+    calculate_benchmark_price,
     calculate_compare_price
 )
 
@@ -12,6 +13,14 @@ router = APIRouter(
 @router.post("/compare-price")
 def get_compare_price(data: Dict[str, Any]):
     result = calculate_compare_price(data)
+
+    return {
+        "success": True,
+        "data": result
+    }
+@router.post("/benchmark")
+def get_benchmark(data: Dict[str, Any]):
+    result = calculate_benchmark_price(data)
 
     return {
         "success": True,

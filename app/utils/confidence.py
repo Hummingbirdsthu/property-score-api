@@ -255,106 +255,106 @@ def calculate_confidence(data: dict) -> dict:
 # Demo / quick-test
 # ---------------------------------------------------------------------------
 
-if __name__ == "__main__":
-    import json
-    sample_output = {
-    "target_asset": {
-        "asset_id": "TSMT_001",
-        "property_type": "Nhà riêng",
-        #"price": null,
-        "area": 74,
-        "road_width": 4,
-        "length": 18,
-        "legal": "sổ đỏ/sổ hồng",
-        "address": "Chu Văn An, P12, Bình Thạnh",
-        "ward": "Phường 12",
-        "district": "Bình Thạnh",
-        "city": "Hồ Chí Minh",
-        "lat": 10.81095064,
-        "lng": 106.701879,
-        "alley_width": 6,
-        "alley_level": 1,
-        "alley_type": "thông",
-        "floors": 2,
-        # "house_direction": null,
-        # "features": {
-        #   "is_corner": false,
-        #   "is_wide_alley": true,
-        #   "is_full_furniture": true,
-        #   "is_new_house": true,
-        #   "is_business_good": true
-        # },
-        "nearby": {
-        "school": 167,
-        "hospital": 781,
-        "market": 711,
-        "airport": 5107,
-        "railway": 1959,
-        "landfill": 2204,
-        "pagoda": 582
-        },
-        "note": "Hẻm ô tô - 74m2 - nhà mới full nội thất"
-    },
-    "comparable_assets": [
-        {
-        "asset_id": "TSSS_001",
-        "price": 18000000000,
-        "area": 330,
-        "address": "Chu Văn An, P12",
-        "lat": 10.81078753,
-        "lng": 106.7019831,
-        "nearby": {
-            "school": 180.8,
-            "hospital": 792.5,
-            "market": 724,
-            "airport": 5121.4,
-            "railway": 1975.2,
-            "landfill": 2200.2,
-            "pagoda": 594.2
-        },
-        "DistanceM": 375,
-        "note": "Nhà chính chủ cần bán gấp"
-        },
-        {
-        "asset_id": "TSSS_002",
-        "price": 6200000000,
-        "area": 36,
-        "address": "Chu Văn An, P12",
-        "lat": 10.81069242,
-        "lng": 106.7017343,
-        "nearby": {
-            "school": 199.5,
-            "hospital": 765.6,
-            "market": 697.6,
-            "airport": 5096.3,
-            "railway": 1952.3,
-            "landfill": 2229.4,
-            "pagoda": 567.6
-        },
-        "DistanceM": 365.23009145,
-        "note": "Nhà mới 2 tầng - nở hậu"
-        },
-        {
-        "asset_id": "TSSS_003",
-        "price": 9700000000,
-        "area": 74,
-        "address": "Chu Văn An, P12",
-        "lat": 10.81095064,
-        "lng": 106.701879,
-        "nearby": {
-            "school": 167,
-            "hospital": 781.1,
-            "market": 711.7,
-            "airport": 5107.3,
-            "railway": 1959.2,
-            "landfill": 2204.9,
-            "pagoda": 582.1
-        },
-        "DistanceM": 344.02104631,
-        "note": "Hẻm ô tô - nhà mới full nội thất"
-        }
-    ]
-    }
+# if __name__ == "__main__":
+#     import json
+    # sample_output = {
+    # "target_asset": {
+    #     "asset_id": "TSMT_001",
+    #     "property_type": "Nhà riêng",
+    #     #"price": null,
+    #     "area": 74,
+    #     "road_width": 4,
+    #     "length": 18,
+    #     "legal": "sổ đỏ/sổ hồng",
+    #     "address": "Chu Văn An, P12, Bình Thạnh",
+    #     "ward": "Phường 12",
+    #     "district": "Bình Thạnh",
+    #     "city": "Hồ Chí Minh",
+    #     "lat": 10.81095064,
+    #     "lng": 106.701879,
+    #     "alley_width": 6,
+    #     "alley_level": 1,
+    #     "alley_type": "thông",
+    #     "floors": 2,
+    #     # "house_direction": null,
+    #     # "features": {
+    #     #   "is_corner": false,
+    #     #   "is_wide_alley": true,
+    #     #   "is_full_furniture": true,
+    #     #   "is_new_house": true,
+    #     #   "is_business_good": true
+    #     # },
+    #     "nearby": {
+    #     "school": 167,
+    #     "hospital": 781,
+    #     "market": 711,
+    #     "airport": 5107,
+    #     "railway": 1959,
+    #     "landfill": 2204,
+    #     "pagoda": 582
+    #     },
+    #     "note": "Hẻm ô tô - 74m2 - nhà mới full nội thất"
+    # },
+    # "comparable_assets": [
+    #     {
+    #     "asset_id": "TSSS_001",
+    #     "price": 18000000000,
+    #     "area": 330,
+    #     "address": "Chu Văn An, P12",
+    #     "lat": 10.81078753,
+    #     "lng": 106.7019831,
+    #     "nearby": {
+    #         "school": 180.8,
+    #         "hospital": 792.5,
+    #         "market": 724,
+    #         "airport": 5121.4,
+    #         "railway": 1975.2,
+    #         "landfill": 2200.2,
+    #         "pagoda": 594.2
+    #     },
+    #     "DistanceM": 375,
+    #     "note": "Nhà chính chủ cần bán gấp"
+    #     },
+    #     {
+    #     "asset_id": "TSSS_002",
+    #     "price": 6200000000,
+    #     "area": 36,
+    #     "address": "Chu Văn An, P12",
+    #     "lat": 10.81069242,
+    #     "lng": 106.7017343,
+    #     "nearby": {
+    #         "school": 199.5,
+    #         "hospital": 765.6,
+    #         "market": 697.6,
+    #         "airport": 5096.3,
+    #         "railway": 1952.3,
+    #         "landfill": 2229.4,
+    #         "pagoda": 567.6
+    #     },
+    #     "DistanceM": 365.23009145,
+    #     "note": "Nhà mới 2 tầng - nở hậu"
+    #     },
+    #     {
+    #     "asset_id": "TSSS_003",
+    #     "price": 9700000000,
+    #     "area": 74,
+    #     "address": "Chu Văn An, P12",
+    #     "lat": 10.81095064,
+    #     "lng": 106.701879,
+    #     "nearby": {
+    #         "school": 167,
+    #         "hospital": 781.1,
+    #         "market": 711.7,
+    #         "airport": 5107.3,
+    #         "railway": 1959.2,
+    #         "landfill": 2204.9,
+    #         "pagoda": 582.1
+    #     },
+    #     "DistanceM": 344.02104631,
+    #     "note": "Hẻm ô tô - nhà mới full nội thất"
+    #     }
+    # ]
+    # }
 
-    result = calculate_confidence(sample_output)
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+#     result = calculate_confidence(sample_output)
+#     print(json.dumps(result, ensure_ascii=False, indent=2))
