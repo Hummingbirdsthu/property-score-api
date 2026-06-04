@@ -507,23 +507,23 @@ FEATURE_WEIGHTS: dict[str, float] = {
     "frontage_count":  FRONTAGE_COUNT_W,
     "floor_area":      FLOOR_AREA_W,
     "building_grade":  BUILDING_GRADE_W, # 8
-    "school":          SCHOOL_W,
-    "hospital":        HOSPITAL_W,
+    "Nearest_School":  SCHOOL_W,
+    "Nearest_Hospital":HOSPITAL_W,
     "mall":            MALL_W,
     "supermarket":     SUPERMARKET_W,
     "metro":           METRO_W,
     "park":            PARK_W,
     "cbd_dist":        CBD_DIST_W,
     "admin_center":    ADMIN_CENTER_W,
-    "market":          MARKET_W,
+    "Nearest_Market":  MARKET_W,
     "view":            VIEW_W, # 10
-    "landfill":        LANDFILL_W,
+    "Nearest_landfill":LANDFILL_W,
     "wastewater":      WASTEWATER_W,
-    "airport":         AIRPORT_W,
-    "railway":         RAILWAY_W,
-    "cemetery":        CEMETERY_W,
+    "Nearest_Airport": AIRPORT_W,
+    "Nearest_Railway": RAILWAY_W,
+    "Nearest_cemetery":CEMETERY_W,
     "funeral_home":    FUNERAL_HOME_W,
-    "temple":          TEMPLE_W, # 7
+    "Nearest_Pagoda":  TEMPLE_W, # 7
 }
 
 SCORE_FUNCTIONS = {
@@ -545,23 +545,23 @@ SCORE_FUNCTIONS = {
     "frontage_count":  score_frontage_count,
     "floor_area":      score_floor_area,
     "building_grade":  score_building_grade,
-    "school":          score_school,
-    "hospital":        score_hospital,
+    "Nearest_School":  score_school,
+    "Nearest_Hospital":score_hospital,
     "mall":            score_mall,
     "supermarket":     score_supermarket,
     "metro":           score_metro,
     "park":            score_park,
     "cbd_dist":        score_cbd_dist,
     "admin_center":    score_admin_center,
-    "market":          score_market,
+    "Nearest_Market":  score_market,
     "view":            score_view,
-    "landfill":        score_landfill,
+    "Nearest_landfill":score_landfill,
     "wastewater":      score_wastewater,
-    "airport":         score_airport,
-    "railway":         score_railway,
-    "cemetery":        score_cemetery,
+    "Nearest_Airport": score_airport,
+    "Nearest_Railway": score_railway,
+    "Nearest_cemetery":score_cemetery,
     "funeral_home":    score_funeral_home,
-    "temple":          score_temple,
+    "Nearest_Pagoda":  score_temple,
 }
 
 # ---------------------------------------------------------------------------
@@ -609,50 +609,72 @@ def calculate_f_score(house: dict) -> dict:
     # }
 
 def calculate_P_by_f_score(data: dict) -> dict:
-    target = flatten(data["target_asset"])
+    target = flatten_external_target(data)
     f_target = calculate_f_score(target)
 
-    data["target_asset"]["f_tsmt"] = round(f_target, 4)
+    data["f_tsmt"] = round(f_target, 4)
 
-    for i, asset in enumerate(data["comparable_assets"]):
-        comp = flatten(asset)
+    for i, comp_raw in enumerate(data.get("Comparable_Assets", [])):
+        comp = flatten_external_comp(comp_raw)
         f_comp = calculate_f_score(comp)
 
+        price = comp_raw.get("Comparable_Transaction", {}).get("Transaction_Price")
+        area  = comp_raw.get("Comparable_Property_Detail", {}).get("Land_Area")
+        target_area = data.get("LandAreaTotal")
+
         p = (
-            comp.get("price") * f_target * target.get("area") / (f_comp * comp.get("area"))
-            if f_comp != 0 else None
+            price * f_target * target_area / (f_comp * area)
+            if (f_comp != 0 and price and area and target_area) else None
         )
 
-        # Thêm trực tiếp vào asset gốc
-        data["comparable_assets"][i]["f_tsss"] = round(f_comp, 4)
-        data["comparable_assets"][i]["P_tsmt"] = round(p) if p is not None else None
+        data["Comparable_Assets"][i].setdefault("Comparable_Transaction", {})
+        data["Comparable_Assets"][i]["Comparable_Transaction"]["f_tsss"] = round(f_comp, 4)
+        data["Comparable_Assets"][i]["Comparable_Transaction"]["P_tsmt"] = round(p) if p is not None else None
 
     return data
 
+
 # ---------------------------------------------------------------------------
-# flatten json -> dict
+# flatten json -> dict (theo schema bên ngoài)
 # ---------------------------------------------------------------------------
 
-def flatten(asset: dict) -> dict:
+def flatten_external_target(data: dict) -> dict:
     """
-    Flatten asset:
-    - giữ các field thường
-    - bung các dict con (nearby, features, ...)
-    - bỏ dict lồng sâu hơn
+    Flatten target asset từ schema bên ngoài sang dict phẳng cho calculate_f_score.
     """
-    result = {}
+    loc  = data.get("PropertyLocation", {})
+    adv  = data.get("Advantages", {})
 
-    for k, v in asset.items():
-        # dict con -> bung ra
-        if isinstance(v, dict):
-            for sub_k, sub_v in v.items():
-                # chỉ lấy primitive
-                if not isinstance(sub_v, dict):
-                    result[sub_k] = sub_v
-        else:
-            result[k] = v
+    return {
+        # Đường / hẻm
+        "road_width":      data.get("RoadWidth"),
+        "frontage_width":  data.get("FrontageWidth"),
+        "frontage_count":  data.get("frontage_count"),
+        "distance_main":   data.get("distance_to_main_road"),
+        # Đất
+        "area":            data.get("LandAreaTotal"),
+        "floor_area":      data.get("Construction_Area"),
+    }
 
-    return result
+
+def flatten_external_comp(comp: dict) -> dict:
+    """
+    Flatten một comparable asset từ schema bên ngoài sang dict phẳng.
+    """
+    detail = comp.get("Comparable_Property_Detail", {})
+    txn    = comp.get("Comparable_Transaction", {})
+    adv    = comp.get("Advantages", {})
+
+    return {
+        # Đất / công trình
+        "area":           detail.get("Land_Area"),
+        "frontage_width": detail.get("Frontage"),
+        "road_width":     detail.get("Road_width"),
+        "floor_area":     detail.get("Building_Area"),
+        # Giá
+        "price":          txn.get("Transaction_Price"),
+    }
+
 
 # ---------------------------------------------------------------------------
 # Benchmark
@@ -660,24 +682,29 @@ def flatten(asset: dict) -> dict:
 
 def calculate_benchmark(data: dict) -> dict:
     """
-    Đầu vào: output của calculate_P_by_f_score (đã có P_tsmt trong comparable_assets).
-
+    Đầu vào: Json mau
+    Tính benchmark từ P_tsmt của từng comparable (đơn giá = Transaction_Price / Land_Area).
     Trả về data gốc được bổ sung key "benchmark".
     """
-    data = calculate_P_by_f_score(data)
-    comps = data.get("comparable_assets", [])
-    p_list = [c["P_tsmt"] for c in comps if c.get("P_tsmt") is not None]
-    p_min   = min(p_list)
-    p_max   = max(p_list)
+    comps = data.get("Comparable_Assets", [])
+
+    p_list = []
+    for c in comps:
+        p_tsmt = c.get("Comparable_Transaction", {}).get("Transaction_Price")
+        area   = c.get("Comparable_Property_Detail", {}).get("Land_Area")
+        if p_tsmt and area:
+            p_list.append(p_tsmt / area)
+
+    p_min = min(p_list)
+    p_max = max(p_list)
 
     data["benchmark"] = {
-        "average":          round(sum(p_list) / len(p_list)),
-        "median":           round(statistics.median(p_list)),
-        "min":              p_min,
-        "max":              p_max,
-        "range":            p_max - p_min,
-        "n_samples":        len(p_list),
-        #"comparable_assets": detail,
+        "average":   round(sum(p_list) / len(p_list)),
+        "median":    round(statistics.median(p_list)),
+        "min":       p_min,
+        "max":       p_max,
+        "range":     p_max - p_min,
+        "n_samples": len(p_list),
     }
     return data
 
@@ -689,102 +716,152 @@ def calculate_benchmark(data: dict) -> dict:
 #     import json
 
 #     sample = {
-#     "target_asset": {
-#         "asset_id": "TSMT_001",
-#         "property_type": "Nhà riêng",
-#         #"price": null,
-#         "area": 74,
-#         "road_width": 4,
-#         "length": 18,
-#         "legal": "sổ đỏ/sổ hồng",
-#         "address": "Chu Văn An, P12, Bình Thạnh",
-#         "ward": "Phường 12",
-#         "district": "Bình Thạnh",
-#         "city": "Hồ Chí Minh",
-#         "lat": 10.81095064,
-#         "lng": 106.701879,
-#         "alley_width": 6,
-#         "alley_level": 1,
-#         "alley_type": "thông",
-#         "floors": 2,
-#         # "house_direction": null,
-#         # "features": {
-#         #   "is_corner": false,
-#         #   "is_wide_alley": true,
-#         #   "is_full_furniture": true,
-#         #   "is_new_house": true,
-#         #   "is_business_good": true
-#         # },
-#         "nearby": {
-#         "school": 167,
-#         "hospital": 781,
-#         "market": 711,
-#         "airport": 5107,
-#         "railway": 1959,
-#         "landfill": 2204,
-#         "pagoda": 582
-#         },
-#         "note": "Hẻm ô tô - 74m2 - nhà mới full nội thất"
+#     "PropertyId": "TSMT",
+#     "PropertyType": "Nha_o",
+#     #"CollateralFlag": false,
+#     "OwnershipPercentage": 0,
+#     "DisputeFlag": "Khong_tranh_chap",
+#     #"MortgageFlag": false,
+#     "LandAreaTotal": 50,
+#     "LandUsePurpose": "ODT___t______th_",
+#     "RoadAccessType": "M_t_ti_n",
+#     "FrontageWidth": 50,
+#     "RoadWidth": 10,
+#     #"AlleyFlag": false,
+#     "Version": 0,
+#     "Tax_Obligations": "___n_p",
+#     "Planning": "Kh_ng_quy_ho_ch",
+#     "frontage_count": 1,
+#     "distance_to_main_road": 10,
+#     "Construction_Area": 50,
+#     #"Property_On_land": false,
+#     "structure_type": "B__t_ng_c_t_th_p",
+
+#     "PropertyLocation": {
+#         "HouseNumber": "",
+#         "Street": "Đường Nguyễn Thượng Hiền",
+#         "Ward": "Phường 6",
+#         "District": "Quận Bình Thạnh",
+#         "Province": "Hồ Chí Minh",
+#         "Latitude": 10.80560109,
+#         "Longitude": 106.68607077,
+#         "LocationScore": 0
 #     },
-#     "comparable_assets": [
+
+#     "Comparable_Assets": [
 #         {
-#         "asset_id": "TSSS_001",
-#         "price": 18000000000,
-#         "area": 330,
-#         "address": "Chu Văn An, P12",
-#         "lat": 10.81078753,
-#         "lng": 106.7019831,
-#         "nearby": {
-#             "school": 180.8,
-#             "hospital": 792.5,
-#         "market": 724,
-#             "airport": 5121.4,
-#             "railway": 1975.2,
-#             "landfill": 2200.2,
-#             "pagoda": 594.2
+#         "Comparable_id": "117.49254466",
+#         "property_type": "Nhà mặt phố",
+#         "address": "Đường Nguyễn Thượng Hiền, Phường 6, Quận Bình Thạnh, Hồ Chí Minh",
+#         "ward": "Phường 6",
+#         "district": "Quận Bình Thạnh",
+#         "province": "Hồ Chí Minh",
+#         "Latitude": 10.80833966,
+#         "longtitude": 106.684205,
+#         "Note": "Bán nhanh trong tháng chỉ 16tỷ9 ngay mặt tiền doanh thu 90tr/tháng",
+
+#         "Comparable_Property_Detail": {
+#             "Land_Area": 900,
+#             "Building_Area": 0,
+#             "Frontage": 0,
+#             "Road_width": 0,
+#             "Floor_Count": 30,
+#             "Construction_year": 0,
+#             "Legal_status": "sổ đỏ/sổ hồng"
 #         },
-#         "note": "Nhà chính chủ cần bán gấp"
+
+#         "Comparable_Transaction": {
+#             "Transaction_Price": 16900000000000000,
+#             "Listing_Price": 0,
+#             "Price_Per_m2": 0,
+#             "Transaction_Date": "2026-05-04T17:00:00.000Z",
+#             "Distance_To_Subject": 0
 #         },
+
+#         "Advantages": {
+#             "Nearest_School": 191,
+#             "Nearest_Hospital": 462.4,
+#             "Nearest_Market": 144.8,
+#             "Nearest_cemetery": 730.2,
+#             "Nearest_Airport": 3297.1,
+#             "Nearest_Railway": 839.8,
+#             "Nearest_landfill": 4140.6,
+#             "Nearest_Pagoda": 158.9
+#         },
+
+#         "Comparable_Distances": [
+#             {
+#             "DistanceM": 365.23009145
+#             }
+#         ]
+#         },
+
 #         {
-#         "asset_id": "TSSS_002",
-#         "price": 6200000000,
-#         "area": 36,
-#         "address": "Chu Văn An, P12",
-#         "lat": 10.81069242,
-#         "lng": 106.7017343,
-#         "nearby": {
-#             "school": 199.5,
-#             "hospital": 765.6,
-#             "market": 697.6,
-#             "airport": 5096.3,
-#             "railway": 1952.3,
-#             "landfill": 2229.4,
-#             "pagoda": 567.6
+#         "Comparable_id": "117.49252595",
+#         "property_type": "Nhà mặt phố",
+#         "address": "Đường Nguyễn Thượng Hiền, Phường 5, Quận Phú Nhuận, Hồ Chí Minh",
+#         "ward": "Phường 5",
+#         "district": "Quận Phú Nhuận",
+#         "province": "Hồ Chí Minh",
+#         "Latitude": 10.80819335,
+#         "longtitude": 106.6843326,
+#         "Note": "Thu nhập 400 triệu - 105 tỷ! Bán tòa nhà 1946m2 Nguyễn Thượng Hiền, Bình Thạnh - Hầm 9 Tầng",
+
+#         "Comparable_Property_Detail": {
+#             "Land_Area": 28517,
+#             "Building_Area": 0,
+#             "Frontage": 124,
+#             "Road_width": 0,
+#             "Floor_Count": 80,
+#             "Construction_year": 0,
+#             "Legal_status": "sổ đỏ/sổ hồng"
 #         },
-#         "note": "Nhà mới 2 tầng - nở hậu"
+
+#         "Comparable_Transaction": {
+#             "Transaction_Price": 1050000000000,
+#             "Listing_Price": 0,
+#             "Price_Per_m2": 0,
+#             "Transaction_Date": "2026-05-08T17:00:00.000Z",
+#             "Distance_To_Subject": 0
 #         },
-#         {
-#         "asset_id": "TSSS_003",
-#         "price": 9700000000,
-#         "area": 74,
-#         "address": "Chu Văn An, P12",
-#         "lat": 10.81095064,
-#         "lng": 106.701879,
-#         "nearby": {
-#             "school": 167,
-#             "hospital": 781.1,
-#             "market": 711.7,
-#             "airport": 5107.3,
-#             "railway": 1959.2,
-#             "landfill": 2204.9,
-#             "pagoda": 582.1
+
+#         "Advantages": {
+#             "Nearest_School": 172.2,
+#             "Nearest_Hospital": 441,
+#             "Nearest_Market": 153.6,
+#             "Nearest_cemetery": 751.6,
+#             "Nearest_Airport": 3315.7,
+#             "Nearest_Railway": 855.3,
+#             "Nearest_landfill": 4131.2,
+#             "Nearest_Pagoda": 150.8
 #         },
-#         "note": "Hẻm ô tô - nhà mới full nội thất"
+
+#         "Comparable_Distances": [
+#             {
+#             "DistanceM": 344.02104631
+#             }
+#         ]
 #         }
-#     ]
+#     ],
+
+#     "Legal_Certificate": {
+#         "Certificate_Serial": "po09839582",
+#         "Issue_Date": "2026-04-30T17:00:00.000Z",
+#         "Certificate_type": "So_do"
+#     },
+
+#     "Advantages": {
+#         "Nearest_School": 43.7,
+#         "Nearest_Hospital": 100.4,
+#         "Nearest_Market": 380.8,
+#         "Nearest_Airport": 3597.1,
+#         "Nearest_Railway": 1153.2,
+#         "Nearest_landfill": 4033.1,
+#         "Nearest_Pagoda": 212.3
 #     }
-#     target = flatten(sample["target_asset"])
-#     result = calculate_P_by_f_score(sample)
+#     }
+#     #target = flatten_external_target(sample)
+#     result = calculate_benchmark(sample)
 #     print("Input:", json.dumps(sample, ensure_ascii=False, indent=2))
 #     print("\nOutput:")
 #     #print(result)

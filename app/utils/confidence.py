@@ -1,6 +1,6 @@
 """
 Tính độ tin cậy (Confidence Score) cho kết quả định giá AVM.
-Đầu vào: JSON 
+Đầu vào: JSON schema bên ngoài sau khi chạy calculate_P_by_f_score.
 """
 
 from datetime import datetime, date
@@ -63,20 +63,16 @@ def score_thoi_gian(avg_days: float) -> int:
 # ---------------------------------------------------------------------------
 
 SOURCE_SCORE = {
-    "cong_chung":       100,
-    "registry":         100,
-    "core_banking":     95,
-    "third_party":      90,
-    "khung_gia":        90,
-    "listing":          85,
-    "user_input":       80,
+    "cong_chung":   100,
+    "registry":     100,
+    "core_banking":  95,
+    "third_party":   90,
+    "khung_gia":     90,
+    "listing":       85,
+    "user_input":    80,
 }
 
 def score_nguon(source: str) -> int:
-    """
-    source: một trong các key của SOURCE_SCORE.
-    Nếu không khớp trả về 80 (mức thấp nhất đã biết).
-    """
     return SOURCE_SCORE.get(source.lower(), 85)
 
 
@@ -99,12 +95,11 @@ def score_bien_gia(spread_pct: float) -> int:
         return 20
 
 
-def calc_spread(p_list: list[float]) -> float:
-    """Tính spread (%) từ danh sách giá."""
-    if len(p_list) == 0:
-        return 1
+def calc_spread(p_list: list) -> float:
+    if len(p_list) < 2:
+        return 0.0
     pmax, pmin, pavg = max(p_list), min(p_list), sum(p_list) / len(p_list)
-    return (pmax - pmin) / pavg * 100# if pavg else 0
+    return (pmax - pmin) / pavg * 100 if pavg else 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -112,15 +107,14 @@ def calc_spread(p_list: list[float]) -> float:
 # ---------------------------------------------------------------------------
 
 WEIGHTS = {
-    "so_luong":   0.15,
+    "so_luong":    0.15,
     "khoang_cach": 0.25,
-    "thoi_gian":  0.25,
-    "nguon":      0.20,
-    "bien_gia":   0.15,
+    "thoi_gian":   0.25,
+    "nguon":       0.20,
+    "bien_gia":    0.15,
 }
 
 def overall_confidence(scores: dict) -> float:
-    """scores: dict với các key trùng WEIGHTS."""
     return sum(scores[k] * WEIGHTS[k] for k in WEIGHTS)
 
 
@@ -128,7 +122,7 @@ def overall_confidence(scores: dict) -> float:
 # 7. Confidence Grade
 # ---------------------------------------------------------------------------
 
-def grade(cs: float) -> tuple[str, str]:
+def grade(cs: float) -> tuple:
     if cs >= 90:
         return "A", "Rất tin cậy"
     elif cs >= 80:
@@ -140,12 +134,12 @@ def grade(cs: float) -> tuple[str, str]:
     else:
         return "E", "Không khuyến nghị"
 
+
 # ---------------------------------------------------------------------------
 # 8. Warning Engine
 # ---------------------------------------------------------------------------
 
-def warnings(n_tsss: int, avg_distance_m: float, avg_days: float,
-              spread_pct: float, source_score: int) -> list[str]:
+def warnings(n_tsss, avg_distance_m, avg_days, spread_pct, source_score) -> list:
     msgs = []
     if n_tsss < 3:
         msgs.append("Không đủ comparable (TSSS < 3)")
@@ -159,12 +153,12 @@ def warnings(n_tsss: int, avg_distance_m: float, avg_days: float,
         msgs.append("Dữ liệu không đáng tin (Data Source score < 50)")
     return msgs
 
-# Helper: tính số ngày từ transaction_date đến hôm nay
+
+# ---------------------------------------------------------------------------
+# Helper
+# ---------------------------------------------------------------------------
+
 def days_since(transaction_date) -> float:
-    """
-    transaction_date: str ISO (YYYY-MM-DD), date, hoặc datetime.
-    Trả về số ngày tính đến hôm nay.
-    """
     if isinstance(transaction_date, str):
         transaction_date = date.fromisoformat(transaction_date[:10])
     if isinstance(transaction_date, datetime):
@@ -175,38 +169,46 @@ def days_since(transaction_date) -> float:
 # ---------------------------------------------------------------------------
 # Hàm chính
 # ---------------------------------------------------------------------------
+
 def calculate_confidence(data: dict) -> dict:
     """
-    Đầu vào: output của calculate_P_by_f_score(sample) — đã có f_tsmt, f_tsss, P_tsmt.
+    Đầu vào : JSON schema bên ngoài sau khi chạy calculate_P_by_f_score.
+    Trả về  : data gốc được bổ sung key "confidence".
 
-    Mỗi asset trong comparable_assets cần có thêm:
-        - DistanceM       : khoảng cách tới TSMT (mét)
-        - transaction_date : ngày giao dịch (str ISO hoặc date)
-        - data_source      : nguồn dữ liệu (xem SOURCE_SCORE)
-
-    Trả về dict gốc được bổ sung thêm key "confidence".
+    Các field đọc từ schema bên ngoài:
+        - Comparable_Assets[i].Comparable_Distances[0].DistanceM
+        - Comparable_Assets[i].Comparable_Transaction.Transaction_Date
+        - Comparable_Assets[i].Comparable_Transaction.Transaction_Price
+        - Comparable_Assets[i].Comparable_Property_Detail.Land_Area
+        - Comparable_Assets[i].data_source   (tuỳ chọn)
     """
-    comps = data.get("comparable_assets", [])
+    comps = data.get("Comparable_Assets", [])
     n = len(comps)
-    comps_with_dist = [c for c in comps if c.get("DistanceM") is not None]#["Comparable_Distances"][0]
-    
+
+    # Lấy DistanceM từ Comparable_Distances[0]
+    comps_with_dist = [
+        c for c in comps
+        if c.get("Comparable_Distances") and
+           c["Comparable_Distances"][0].get("DistanceM") is not None
+    ]
+
     # 1. Số lượng
     k_so_luong = score_so_luong(n)
 
-    # 2. khoang cach
-    avg_dist = sum(c["DistanceM"] for c in comps_with_dist) / len(comps_with_dist)#["Comparable_Distances"][0]
+    # 2. Khoảng cách trung bình
+    avg_dist = sum(c["Comparable_Distances"][0]["DistanceM"] for c in comps_with_dist) / len(comps_with_dist)
     k_khoang_cach = score_khoang_cach(avg_dist)
 
-    # 3. Thời gian trung bình 
+    # 3. Thời gian trung bình — Transaction_Date trong Comparable_Transaction
     ages = []
     for c in (comps_with_dist if comps_with_dist else comps):
-        td = c.get("transaction_date")
+        td = c.get("Comparable_Transaction", {}).get("Transaction_Date")
         if td:
             ages.append(days_since(td))
     avg_days = sum(ages) / len(ages) if ages else 0.0
     k_thoi_gian = score_thoi_gian(avg_days)
 
-    # 4. Nguồn dữ liệu — lấy nguồn phổ biến nhất hoặc trung bình
+    # 4. Nguồn dữ liệu
     source_scores = []
     for c in comps:
         src = c.get("data_source")
@@ -214,8 +216,13 @@ def calculate_confidence(data: dict) -> dict:
             source_scores.append(score_nguon(src))
     k_nguon = round(sum(source_scores) / len(source_scores)) if source_scores else 85
 
-    # 5. Biên giá từ price cua tsss
-    p_list = [c.get("price")/c.get("area") for c in comps]
+    # 5. Biên giá — đơn giá = Transaction_Price / Land_Area
+    p_list = []
+    for c in comps:
+        price = c.get("Comparable_Transaction", {}).get("Transaction_Price")
+        area  = c.get("Comparable_Property_Detail", {}).get("Land_Area")
+        if price and area:
+            p_list.append(price / area)
     spread = calc_spread(p_list)
     k_bien_gia = score_bien_gia(spread)
 
@@ -233,128 +240,175 @@ def calculate_confidence(data: dict) -> dict:
     # 7. Warnings
     warns = warnings(n, avg_dist, avg_days, spread, k_nguon)
 
-    # --- Gắn kết quả vào data gốc ---
-    confidence = {
-        "asset_id": data.get("target_asset", {}).get("asset_id"),
+    data["confidence"] = {
+        "asset_id":      data.get("PropertyId"),
         "overall_score": round(cs, 2),
-        "grade": cs_grade,
-        "meaning": cs_meaning,
+        "grade":         cs_grade,
+        "meaning":       cs_meaning,
         "component_scores": {
-            "so_luong_tsss":  {"score": k_so_luong,    "weight": "15%", "n": n},
-            "khoang_cach":    {"score": k_khoang_cach, "weight": "25%", "avg_distance_m": round(avg_dist, 1)},
-            "thoi_gian":      {"score": k_thoi_gian,   "weight": "25%", "avg_days": round(avg_days, 1)},
-            "nguon_du_lieu":  {"score": k_nguon,        "weight": "20%"},
-            "bien_gia":       {"score": k_bien_gia,     "weight": "15%", "spread_pct": round(spread, 2)},
+            "so_luong_tsss": {"score": k_so_luong,    "weight": "15%", "n": n},
+            "khoang_cach":   {"score": k_khoang_cach, "weight": "25%", "avg_distance_m": round(avg_dist, 1)},
+            "thoi_gian":     {"score": k_thoi_gian,   "weight": "25%", "avg_days": round(avg_days, 1)},
+            "nguon_du_lieu": {"score": k_nguon,        "weight": "20%"},
+            "bien_gia":      {"score": k_bien_gia,     "weight": "15%", "spread_pct": round(spread, 2)},
         },
         "warnings": warns,
     }
-    return confidence
+    return data
 
-
-# ---------------------------------------------------------------------------
-# Demo / quick-test
-# ---------------------------------------------------------------------------
 
 # if __name__ == "__main__":
 #     import json
-    # sample_output = {
-    # "target_asset": {
-    #     "asset_id": "TSMT_001",
-    #     "property_type": "Nhà riêng",
-    #     #"price": null,
-    #     "area": 74,
-    #     "road_width": 4,
-    #     "length": 18,
-    #     "legal": "sổ đỏ/sổ hồng",
-    #     "address": "Chu Văn An, P12, Bình Thạnh",
-    #     "ward": "Phường 12",
-    #     "district": "Bình Thạnh",
-    #     "city": "Hồ Chí Minh",
-    #     "lat": 10.81095064,
-    #     "lng": 106.701879,
-    #     "alley_width": 6,
-    #     "alley_level": 1,
-    #     "alley_type": "thông",
-    #     "floors": 2,
-    #     # "house_direction": null,
-    #     # "features": {
-    #     #   "is_corner": false,
-    #     #   "is_wide_alley": true,
-    #     #   "is_full_furniture": true,
-    #     #   "is_new_house": true,
-    #     #   "is_business_good": true
-    #     # },
-    #     "nearby": {
-    #     "school": 167,
-    #     "hospital": 781,
-    #     "market": 711,
-    #     "airport": 5107,
-    #     "railway": 1959,
-    #     "landfill": 2204,
-    #     "pagoda": 582
-    #     },
-    #     "note": "Hẻm ô tô - 74m2 - nhà mới full nội thất"
-    # },
-    # "comparable_assets": [
-    #     {
-    #     "asset_id": "TSSS_001",
-    #     "price": 18000000000,
-    #     "area": 330,
-    #     "address": "Chu Văn An, P12",
-    #     "lat": 10.81078753,
-    #     "lng": 106.7019831,
-    #     "nearby": {
-    #         "school": 180.8,
-    #         "hospital": 792.5,
-    #         "market": 724,
-    #         "airport": 5121.4,
-    #         "railway": 1975.2,
-    #         "landfill": 2200.2,
-    #         "pagoda": 594.2
-    #     },
-    #     "DistanceM": 375,
-    #     "note": "Nhà chính chủ cần bán gấp"
-    #     },
-    #     {
-    #     "asset_id": "TSSS_002",
-    #     "price": 6200000000,
-    #     "area": 36,
-    #     "address": "Chu Văn An, P12",
-    #     "lat": 10.81069242,
-    #     "lng": 106.7017343,
-    #     "nearby": {
-    #         "school": 199.5,
-    #         "hospital": 765.6,
-    #         "market": 697.6,
-    #         "airport": 5096.3,
-    #         "railway": 1952.3,
-    #         "landfill": 2229.4,
-    #         "pagoda": 567.6
-    #     },
-    #     "DistanceM": 365.23009145,
-    #     "note": "Nhà mới 2 tầng - nở hậu"
-    #     },
-    #     {
-    #     "asset_id": "TSSS_003",
-    #     "price": 9700000000,
-    #     "area": 74,
-    #     "address": "Chu Văn An, P12",
-    #     "lat": 10.81095064,
-    #     "lng": 106.701879,
-    #     "nearby": {
-    #         "school": 167,
-    #         "hospital": 781.1,
-    #         "market": 711.7,
-    #         "airport": 5107.3,
-    #         "railway": 1959.2,
-    #         "landfill": 2204.9,
-    #         "pagoda": 582.1
-    #     },
-    #     "DistanceM": 344.02104631,
-    #     "note": "Hẻm ô tô - nhà mới full nội thất"
-    #     }
-    # ]
-    # }
 
-#     result = calculate_confidence(sample_output)
+#     sample = {
+#     "PropertyId": "TSMT",
+#     "PropertyType": "Nha_o",
+#     #"CollateralFlag": false,
+#     "OwnershipPercentage": 0,
+#     "DisputeFlag": "Khong_tranh_chap",
+#     #"MortgageFlag": false,
+#     "LandAreaTotal": 50,
+#     "LandUsePurpose": "ODT___t______th_",
+#     "RoadAccessType": "M_t_ti_n",
+#     "FrontageWidth": 50,
+#     "RoadWidth": 10,
+#     #"AlleyFlag": false,
+#     "Version": 0,
+#     "Tax_Obligations": "___n_p",
+#     "Planning": "Kh_ng_quy_ho_ch",
+#     "frontage_count": 1,
+#     "distance_to_main_road": 10,
+#     "Construction_Area": 50,
+#     #"Property_On_land": false,
+#     "structure_type": "B__t_ng_c_t_th_p",
+
+#     "PropertyLocation": {
+#         "HouseNumber": "",
+#         "Street": "Đường Nguyễn Thượng Hiền",
+#         "Ward": "Phường 6",
+#         "District": "Quận Bình Thạnh",
+#         "Province": "Hồ Chí Minh",
+#         "Latitude": 10.80560109,
+#         "Longitude": 106.68607077,
+#         "LocationScore": 0
+#     },
+
+#     "Comparable_Assets": [
+#         {
+#         "Comparable_id": "117.49254466",
+#         "property_type": "Nhà mặt phố",
+#         "address": "Đường Nguyễn Thượng Hiền, Phường 6, Quận Bình Thạnh, Hồ Chí Minh",
+#         "ward": "Phường 6",
+#         "district": "Quận Bình Thạnh",
+#         "province": "Hồ Chí Minh",
+#         "Latitude": 10.80833966,
+#         "longtitude": 106.684205,
+#         "Note": "Bán nhanh trong tháng chỉ 16tỷ9 ngay mặt tiền doanh thu 90tr/tháng",
+
+#         "Comparable_Property_Detail": {
+#             "Land_Area": 900,
+#             "Building_Area": 0,
+#             "Frontage": 0,
+#             "Road_width": 0,
+#             "Floor_Count": 30,
+#             "Construction_year": 0,
+#             "Legal_status": "sổ đỏ/sổ hồng"
+#         },
+
+#         "Comparable_Transaction": {
+#             "Transaction_Price": 16900000000000000,
+#             "Listing_Price": 0,
+#             "Price_Per_m2": 0,
+#             "Transaction_Date": "2026-05-04T17:00:00.000Z",
+#             "Distance_To_Subject": 0
+#         },
+
+#         "Advantages": {
+#             "Nearest_School": 191,
+#             "Nearest_Hospital": 462.4,
+#             "Nearest_Market": 144.8,
+#             "Nearest_cemetery": 730.2,
+#             "Nearest_Airport": 3297.1,
+#             "Nearest_Railway": 839.8,
+#             "Nearest_landfill": 4140.6,
+#             "Nearest_Pagoda": 158.9
+#         },
+
+#         "Comparable_Distances": [
+#             {
+#             "DistanceM": 365.23009145
+#             }
+#         ]
+#         },
+
+#         {
+#         "Comparable_id": "117.49252595",
+#         "property_type": "Nhà mặt phố",
+#         "address": "Đường Nguyễn Thượng Hiền, Phường 5, Quận Phú Nhuận, Hồ Chí Minh",
+#         "ward": "Phường 5",
+#         "district": "Quận Phú Nhuận",
+#         "province": "Hồ Chí Minh",
+#         "Latitude": 10.80819335,
+#         "longtitude": 106.6843326,
+#         "Note": "Thu nhập 400 triệu - 105 tỷ! Bán tòa nhà 1946m2 Nguyễn Thượng Hiền, Bình Thạnh - Hầm 9 Tầng",
+
+#         "Comparable_Property_Detail": {
+#             "Land_Area": 28517,
+#             "Building_Area": 0,
+#             "Frontage": 124,
+#             "Road_width": 0,
+#             "Floor_Count": 80,
+#             "Construction_year": 0,
+#             "Legal_status": "sổ đỏ/sổ hồng"
+#         },
+
+#         "Comparable_Transaction": {
+#             "Transaction_Price": 1050000000000,
+#             "Listing_Price": 0,
+#             "Price_Per_m2": 0,
+#             "Transaction_Date": "2026-05-08T17:00:00.000Z",
+#             "Distance_To_Subject": 0
+#         },
+
+#         "Advantages": {
+#             "Nearest_School": 172.2,
+#             "Nearest_Hospital": 441,
+#             "Nearest_Market": 153.6,
+#             "Nearest_cemetery": 751.6,
+#             "Nearest_Airport": 3315.7,
+#             "Nearest_Railway": 855.3,
+#             "Nearest_landfill": 4131.2,
+#             "Nearest_Pagoda": 150.8
+#         },
+
+#         "Comparable_Distances": [
+#             {
+#             "DistanceM": 344.02104631
+#             }
+#         ]
+#         }
+#     ],
+
+#     "Legal_Certificate": {
+#         "Certificate_Serial": "po09839582",
+#         "Issue_Date": "2026-04-30T17:00:00.000Z",
+#         "Certificate_type": "So_do"
+#     },
+
+#     "Advantages": {
+#         "Nearest_School": 43.7,
+#         "Nearest_Hospital": 100.4,
+#         "Nearest_Market": 380.8,
+#         "Nearest_Airport": 3597.1,
+#         "Nearest_Railway": 1153.2,
+#         "Nearest_landfill": 4033.1,
+#         "Nearest_Pagoda": 212.3
+#     }
+#     }
+#     #target = flatten_external_target(sample)
+#     result = calculate_confidence(sample)
+#     print("Input:", json.dumps(sample, ensure_ascii=False, indent=2))
+#     print("\nOutput:")
+#     #print(result)
 #     print(json.dumps(result, ensure_ascii=False, indent=2))
+
