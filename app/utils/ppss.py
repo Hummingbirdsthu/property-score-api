@@ -509,7 +509,7 @@ FEATURE_WEIGHTS: dict[str, float] = {
     "building_grade":  BUILDING_GRADE_W, # 8
     "Nearest_School":  SCHOOL_W,
     "Nearest_Hospital":HOSPITAL_W,
-    "mall":            MALL_W,
+    "Nearest_mall":    MALL_W,
     "supermarket":     SUPERMARKET_W,
     "metro":           METRO_W,
     "park":            PARK_W,
@@ -547,7 +547,7 @@ SCORE_FUNCTIONS = {
     "building_grade":  score_building_grade,
     "Nearest_School":  score_school,
     "Nearest_Hospital":score_hospital,
-    "mall":            score_mall,
+    "Nearest_mall":    score_mall,
     "supermarket":     score_supermarket,
     "metro":           score_metro,
     "park":            score_park,
@@ -569,28 +569,6 @@ SCORE_FUNCTIONS = {
 # ---------------------------------------------------------------------------
 
 def calculate_f_score(house: dict) -> dict:
-    """
-    Tính tổng điểm thương mại cho một ngôi nhà.
-
-    Parameters
-    ----------
-    house : dict
-        JSON với các key:
-          - road_type    : str  ("CBD" | "Trục chính" | "Khu vực" | "Nội khu" | "Đường nhỏ")
-          - road_width   : float (mét)
-          - poi_density  : int   (số POI)
-          - amenity      : int   (số nhóm tiện ích)
-          - sidewalk     : float (mét)
-
-    Returns
-    -------
-    dict
-        {
-            "total_score"  : float,   # tổng điểm (tối đa 0.80)
-            "normalized"   : float,   # điểm chuẩn hóa về [0, 1]
-            "breakdown"    : dict     # chi tiết từng feature
-        }
-    """
     breakdown: dict[str, float] = {}
     max_possible = 0.0
 
@@ -611,8 +589,7 @@ def calculate_f_score(house: dict) -> dict:
 def calculate_P_by_f_score(data: dict) -> dict:
     target = flatten_external_target(data)
     f_target = calculate_f_score(target)
-
-    data["f_tsmt"] = round(f_target, 4)
+    results = []
 
     for i, comp_raw in enumerate(data.get("Comparable_Assets", [])):
         comp = flatten_external_comp(comp_raw)
@@ -620,23 +597,54 @@ def calculate_P_by_f_score(data: dict) -> dict:
 
         price = comp_raw.get("Comparable_Transaction", {}).get("Transaction_Price")
         area  = comp_raw.get("Comparable_Property_Detail", {}).get("Land_Area")
-        target_area = data.get("LandAreaTotal")
+        target_area = data.get("land_area")
 
         p = (
             price * f_target * target_area / (f_comp * area)
             if (f_comp != 0 and price and area and target_area) else None
         )
+        results.append({
+            "Comparable_id": comp.get("Comparable_id"),
+            "price": price,
+            "f_score": round(f_comp, 4),
+            "P_tsmt": round(p) if p else None,
+            #"k*W": f_target['breakdown']
+        })
 
-        data["Comparable_Assets"][i].setdefault("Comparable_Transaction", {})
-        data["Comparable_Assets"][i]["Comparable_Transaction"]["f_tsss"] = round(f_comp, 4)
-        data["Comparable_Assets"][i]["Comparable_Transaction"]["P_tsmt"] = round(p) if p is not None else None
+    return {
+        "target_asset": {
+            "PropertyId": target.get("PropertyId"),
+            "f_score": round(f_target, 4),
+            #"k*W": f_comp['breakdown']
+        },
 
-    return data
+        "Comparable_Assets": results
+    }
 
 
 # ---------------------------------------------------------------------------
 # flatten json -> dict (theo schema bên ngoài)
 # ---------------------------------------------------------------------------
+def flatten(asset: dict) -> dict:
+    """
+    Flatten asset:
+    - giữ các field thường
+    - bung các dict con (nearby, features, ...)
+    - bỏ dict lồng sâu hơn
+    """
+    result = {}
+
+    for k, v in asset.items():
+        # dict con -> bung ra
+        if isinstance(v, dict):
+            for sub_k, sub_v in v.items():
+                # chỉ lấy primitive
+                if not isinstance(sub_v, dict):
+                    result[sub_k] = sub_v
+        else:
+            result[k] = v
+
+    return result
 
 def flatten_external_target(data: dict) -> dict:
     """
@@ -652,29 +660,34 @@ def flatten_external_target(data: dict) -> dict:
         "frontage_count":  data.get("frontage_count"),
         "distance_main":   data.get("distance_to_main_road"),
         # Đất
-        "area":            data.get("LandAreaTotal"),
+        "area":            data.get("land_area"),
         "floor_area":      data.get("Construction_Area"),
     }
 
+def flatten_external_target(data: dict) -> dict:
+    target_raw = flatten(data)
+ 
+    # Override các key bị đặt tên khác so với SCORE_FUNCTIONS
+    info = data.get("BuildingInfo", {})
+    target_raw["road_type"]      = data.get("RoadAccessType")
+    target_raw["road_width"]     = data.get("RoadWidth")
+    target_raw["distance_main"]  = data.get("distance_to_main_road")
+    target_raw["area"]           = data.get("land_area")
+    target_raw["floor_area"]     = data.get("Construction_Area") or info.get("ConstructionArea")# or info.get("TotalFloorArea")
+  
+    return target_raw
 
 def flatten_external_comp(comp: dict) -> dict:
-    """
-    Flatten một comparable asset từ schema bên ngoài sang dict phẳng.
-    """
-    detail = comp.get("Comparable_Property_Detail", {})
-    txn    = comp.get("Comparable_Transaction", {})
-    adv    = comp.get("Advantages", {})
+    comp_raw = flatten(comp)
+ 
+    # Override các key bị đặt tên khác trong Comparable_Property_Detail
+    d = comp.get("Comparable_Property_Detail", {})
+    comp_raw["area"]           = d.get("Land_Area")
+    comp_raw["frontage_width"] = d.get("Frontage")
+    comp_raw["road_width"]     = d.get("Road_width")
+    comp_raw["floor_area"]     = d.get("Building_Area")
 
-    return {
-        # Đất / công trình
-        "area":           detail.get("Land_Area"),
-        "frontage_width": detail.get("Frontage"),
-        "road_width":     detail.get("Road_width"),
-        "floor_area":     detail.get("Building_Area"),
-        # Giá
-        "price":          txn.get("Transaction_Price"),
-    }
-
+    return comp_raw
 
 # ---------------------------------------------------------------------------
 # Benchmark
@@ -716,153 +729,482 @@ def calculate_benchmark(data: dict) -> dict:
 #     import json
 
 #     sample = {
-#     "PropertyId": "TSMT",
-#     "PropertyType": "Nha_o",
-#     #"CollateralFlag": false,
-#     "OwnershipPercentage": 0,
-#     "DisputeFlag": "Khong_tranh_chap",
-#     #"MortgageFlag": false,
-#     "LandAreaTotal": 50,
-#     "LandUsePurpose": "ODT___t______th_",
-#     "RoadAccessType": "M_t_ti_n",
-#     "FrontageWidth": 50,
-#     "RoadWidth": 10,
-#     #"AlleyFlag": false,
-#     "Version": 0,
-#     "Tax_Obligations": "___n_p",
-#     "Planning": "Kh_ng_quy_ho_ch",
-#     "frontage_count": 1,
-#     "distance_to_main_road": 10,
-#     "Construction_Area": 50,
-#     #"Property_On_land": false,
-#     "structure_type": "B__t_ng_c_t_th_p",
-
-#     "PropertyLocation": {
-#         "HouseNumber": "",
-#         "Street": "Đường Nguyễn Thượng Hiền",
-#         "Ward": "Phường 6",
-#         "District": "Quận Bình Thạnh",
-#         "Province": "Hồ Chí Minh",
-#         "Latitude": 10.80560109,
-#         "Longitude": 106.68607077,
-#         "LocationScore": 0
-#     },
-
-#     "Comparable_Assets": [
+#   "PropertyId": "TSMT631850",
+#   "PropertyType": "Nha_o",
+#  # "CollateralFlag": false,
+#   "OwnershipPercentage": 0,
+#   "DisputeFlag": "Khong_tranh_chap",
+#   #"MortgageFlag": false,
+#   "LandUsePurpose": "ODT___t______th_",
+#   "RoadAccessType": "M_t_ti_n",
+#   "RoadWidth": 10,
+#  # "AlleyFlag": false,
+#   "Version": 0,
+#   "frontage_count": 1,
+#   "distance_to_main_road": 10,
+#   "Construction_Area": 80,
+#  # "Property_On_land": false,
+#   "structure_type": "B__t_ng_c_t_th_p",
+#   "BuildingInfo": {
+#  #   "BuildingFlag": false,
+#     "TotalFloorArea": 0,
+#     "ConstructionArea": 0,
+#     "NumberOfFloors": 2,
+#     "ConstructionYear": 2004
+#   },
+#   "PropertyLocation": {
+#     "HouseNumber": "88",
+#     "Street": "Lê Lợi",
+#     "Ward": "Phường Bến Thành",
+#     "Province": "Thành phố Hồ Chí Minh",
+#     "Latitude": 10.77293005,
+#     "Longitude": 106.6993318,
+#     "LocationScore": 0
+#   },
+#   "Owner_": {},
+#   "Comparable_Assets": [
+#     {
+#       "Comparable_id": "117.47196215",
+#       "property_type": "Nhà mặt phố",
+#       "address": "Đường Lý Tự Trọng, Phường Bến Thành, Quận 1, Hồ Chí Minh",
+#       "ward": "Phường Bến Thành",
+#       "district": "Quận 1",
+#       "province": "Hồ Chí Minh",
+#       "Latitude": 10.77413995,
+#       "longtitude": 106.6978222,
+#       "Note": "Vị trí vàng - MT Lý Tự Trọng, Quận 1 - 8x20m - 4 Tầng - HĐT 250 triệu/tháng - giá 100 tỷ",
+#       "Comparable_Property_Detail": {
+#         "Land_Area": 1600,
+#         "Building_Area": 0,
+#         "Frontage": 80,
+#         "Road_width": 0,
+#         "Floor_Count": 40,
+#         "Construction_year": 0,
+#         "Legal_status": "khác"
+#       },
+#       "Comparable_Transaction": {
+#         "Transaction_Price": 1000000000000,
+#         "Listing_Price": 0,
+#         "Price_Per_m2": 0,
+#         "Transaction_Date": "2026-05-09T17:00:00.000Z",
+#         "Distance_To_Subject": 0
+#       },
+#       "Advantages": {},
+#       "Comparable_Distances": [
 #         {
-#         "Comparable_id": "117.49254466",
-#         "property_type": "Nhà mặt phố",
-#         "address": "Đường Nguyễn Thượng Hiền, Phường 6, Quận Bình Thạnh, Hồ Chí Minh",
-#         "ward": "Phường 6",
-#         "district": "Quận Bình Thạnh",
-#         "province": "Hồ Chí Minh",
-#         "Latitude": 10.80833966,
-#         "longtitude": 106.684205,
-#         "Note": "Bán nhanh trong tháng chỉ 16tỷ9 ngay mặt tiền doanh thu 90tr/tháng",
-
-#         "Comparable_Property_Detail": {
-#             "Land_Area": 900,
-#             "Building_Area": 0,
-#             "Frontage": 0,
-#             "Road_width": 0,
-#             "Floor_Count": 30,
-#             "Construction_year": 0,
-#             "Legal_status": "sổ đỏ/sổ hồng"
-#         },
-
-#         "Comparable_Transaction": {
-#             "Transaction_Price": 16900000000000000,
-#             "Listing_Price": 0,
-#             "Price_Per_m2": 0,
-#             "Transaction_Date": "2026-05-04T17:00:00.000Z",
-#             "Distance_To_Subject": 0
-#         },
-
-#         "Advantages": {
-#             "Nearest_School": 191,
-#             "Nearest_Hospital": 462.4,
-#             "Nearest_Market": 144.8,
-#             "Nearest_cemetery": 730.2,
-#             "Nearest_Airport": 3297.1,
-#             "Nearest_Railway": 839.8,
-#             "Nearest_landfill": 4140.6,
-#             "Nearest_Pagoda": 158.9
-#         },
-
-#         "Comparable_Distances": [
-#             {
-#             "DistanceM": 365.23009145
-#             }
-#         ]
-#         },
-
-#         {
-#         "Comparable_id": "117.49252595",
-#         "property_type": "Nhà mặt phố",
-#         "address": "Đường Nguyễn Thượng Hiền, Phường 5, Quận Phú Nhuận, Hồ Chí Minh",
-#         "ward": "Phường 5",
-#         "district": "Quận Phú Nhuận",
-#         "province": "Hồ Chí Minh",
-#         "Latitude": 10.80819335,
-#         "longtitude": 106.6843326,
-#         "Note": "Thu nhập 400 triệu - 105 tỷ! Bán tòa nhà 1946m2 Nguyễn Thượng Hiền, Bình Thạnh - Hầm 9 Tầng",
-
-#         "Comparable_Property_Detail": {
-#             "Land_Area": 28517,
-#             "Building_Area": 0,
-#             "Frontage": 124,
-#             "Road_width": 0,
-#             "Floor_Count": 80,
-#             "Construction_year": 0,
-#             "Legal_status": "sổ đỏ/sổ hồng"
-#         },
-
-#         "Comparable_Transaction": {
-#             "Transaction_Price": 1050000000000,
-#             "Listing_Price": 0,
-#             "Price_Per_m2": 0,
-#             "Transaction_Date": "2026-05-08T17:00:00.000Z",
-#             "Distance_To_Subject": 0
-#         },
-
-#         "Advantages": {
-#             "Nearest_School": 172.2,
-#             "Nearest_Hospital": 441,
-#             "Nearest_Market": 153.6,
-#             "Nearest_cemetery": 751.6,
-#             "Nearest_Airport": 3315.7,
-#             "Nearest_Railway": 855.3,
-#             "Nearest_landfill": 4131.2,
-#             "Nearest_Pagoda": 150.8
-#         },
-
-#         "Comparable_Distances": [
-#             {
-#             "DistanceM": 344.02104631
-#             }
-#         ]
+#           "DistanceM": 212.53325933
 #         }
-#     ],
-
-#     "Legal_Certificate": {
-#         "Certificate_Serial": "po09839582",
-#         "Issue_Date": "2026-04-30T17:00:00.000Z",
-#         "Certificate_type": "So_do"
+#       ]
 #     },
+#     {
+#       "Comparable_id": "117.4599718",
+#       "property_type": "Nhà mặt phố",
+#       "address": "Đường Bùi Viện, Phường Phạm Ngũ Lão, Quận 1, Hồ Chí Minh",
+#       "ward": "Phường Phạm Ngũ Lão",
+#       "district": "Quận 1",
+#       "province": "Hồ Chí Minh",
+#       "Latitude": 10.7670049,
+#       "longtitude": 106.6929669,
+#       "Note": "Khu vip bán nhà 2 tầng mặt tiền 8m xe hơi đ.Bùi Viện, Q.1- dt 3,2m*11m sh vuông đẹp- chủ 1 đời xưa",
+#       "Comparable_Property_Detail": {
+#         "Land_Area": 360,
+#         "Building_Area": 0,
+#         "Frontage": 35,
+#         "Road_width": 0,
+#         "Floor_Count": 20,
+#         "Construction_year": 0,
+#         "Legal_status": "sổ đỏ/sổ hồng"
+#       },
+#       "Comparable_Transaction": {
+#         "Transaction_Price": 184000000000,
+#         "Listing_Price": 0,
+#         "Price_Per_m2": 0,
+#         "Transaction_Date": "2026-05-07T17:00:00.000Z",
+#         "Distance_To_Subject": 0
+#       },
+#       "Advantages": {
+#         "Nearest_School": 315.2,
+#         "Nearest_Hospital": 212.7,
+#         "Nearest_Market": 72,
+#         "Nearest_Airport": 6996.3,
+#         "Nearest_Railway": 694.1,
+#         "Nearest_landfill": 6399.9,
+#         "Nearest_mall": 570.8,
+#         "Nearest_Pagoda": 146.8
+#       },
+#       "Comparable_Distances": [
+#         {
+#           "DistanceM": 956.11512178
+#         }
+#       ]
+#     },
+#     {
+#       "Comparable_id": "117.46514059",
+#       "property_type": "Nhà mặt phố",
+#       "address": "Đường Ký Con, Phường Bến Thành, Quận 1, Hồ Chí Minh",
+#       "ward": "Phường Bến Thành",
+#       "district": "Quận 1",
+#       "province": "Hồ Chí Minh",
+#       "Latitude": 10.76717389,
+#       "longtitude": 106.6979667,
+#       "Note": "Ngộp bank bán gấp 3 mặt tiền P. Bến Thành - Q.1. HĐT: 85tr. DT: 6x19m. 115m2. 3 tầng. Giá 30 tỷ",
+#       "Comparable_Property_Detail": {
+#         "Land_Area": 1150,
+#         "Building_Area": 0,
+#         "Frontage": 60,
+#         "Road_width": 0,
+#         "Floor_Count": 30,
+#         "Construction_year": 0,
+#         "Legal_status": "khác"
+#       },
+#       "Comparable_Transaction": {
+#         "Transaction_Price": 300000000000,
+#         "Listing_Price": 0,
+#         "Price_Per_m2": 0,
+#         "Transaction_Date": "2026-05-07T17:00:00.000Z",
+#         "Distance_To_Subject": 0
+#       },
+#       "Advantages": {
+#         "Nearest_School": 181,
+#         "Nearest_Hospital": 146.2,
+#         "Nearest_Market": 69.1,
+#         "Nearest_Airport": 7313.3,
+#         "Nearest_Railway": 420.3,
+#         "Nearest_landfill": 6140.6,
+#         "Nearest_mall": 73.5,
+#         "Nearest_Pagoda": 92.8
+#       },
+#       "Comparable_Distances": [
+#         {
+#           "DistanceM": 772.09084804
+#         },
+#         {
+#           "DistanceM": 653.97743068
+#         }
+#       ]
+#     },
+#     {
+#       "Comparable_id": "117.4720141",
+#       "property_type": "Nhà riêng",
+#       "address": "Đường Lê Thánh Tôn, Phường Bến Thành, Quận 1, Hồ Chí Minh",
+#       "ward": "Phường Bến Thành",
+#       "district": "Quận 1",
+#       "province": "Hồ Chí Minh",
+#       "Latitude": 10.773729,
+#       "longtitude": 106.6982851,
+#       "Note": "Nhà trung tâm quận 1 cách mặt tiền Lê Thánh Tôn chỉ 50m - Giá tốt hiếm có 4x20m 3 lầu giá 25.5 tỷ",
+#       "Comparable_Property_Detail": {
+#         "Land_Area": 800,
+#         "Building_Area": 0,
+#         "Frontage": 0,
+#         "Road_width": 0,
+#         "Floor_Count": 40,
+#         "Construction_year": 0,
+#         "Legal_status": "sổ đỏ/sổ hồng"
+#       },
+#       "Comparable_Transaction": {
+#         "Transaction_Price": 250000000000,
+#         "Listing_Price": 0,
+#         "Price_Per_m2": 0,
+#         "Transaction_Date": "2026-05-10T17:00:00.000Z",
+#         "Distance_To_Subject": 0
+#       },
+#       "Advantages": {
+#         "Nearest_School": 364,
+#         "Nearest_Hospital": 109.8,
+#         "Nearest_Market": 132.2,
+#         "Nearest_Airport": 6786.9,
+#         "Nearest_Railway": 312.6,
+#         "Nearest_landfill": 5466.7,
+#         "Nearest_mall": 258.3,
+#         "Nearest_Pagoda": 191.9
+#       },
+#       "Comparable_Distances": [
+#         {
+#           "DistanceM": 227.19426832
+#         },
+#         {
+#           "DistanceM": 144.62083686
+#         }
+#       ]
+#     },
+#     {
+#       "Comparable_id": "117.4655202",
+#       "property_type": "Nhà mặt phố",
+#       "address": "Đường Ký Con, Phường Nguyễn Thái Bình, Quận 1, Hồ Chí Minh",
+#       "ward": "Phường Nguyễn Thái Bình",
+#       "district": "Quận 1",
+#       "province": "Hồ Chí Minh",
+#       "Latitude": 10.767189,
+#       "longtitude": 106.6983312,
+#       "Note": "Bán nhà Ký Con 68.8m² - mặt tiền - 4 tầng - Quận 1 - giá 36 tỷ",
+#       "Comparable_Property_Detail": {
+#         "Land_Area": 690,
+#         "Building_Area": 0,
+#         "Frontage": 0,
+#         "Road_width": 0,
+#         "Floor_Count": 0,
+#         "Construction_year": 0,
+#         "Legal_status": "khác"
+#       },
+#       "Comparable_Transaction": {
+#         "Transaction_Price": 360000000000,
+#         "Listing_Price": 0,
+#         "Price_Per_m2": 0,
+#         "Transaction_Date": "2026-05-10T17:00:00.000Z",
+#         "Distance_To_Subject": 0
+#       },
+#       "Advantages": {},
+#       "Comparable_Distances": [
+#         {
+#           "DistanceM": 757.89019458
+#         },
+#         {
+#           "DistanceM": 644.39587683
+#         }
+#       ]
+#     },
+#     {
+#       "Comparable_id": "117.46679302",
+#       "property_type": "Nhà mặt phố",
+#       "address": "Đường Calmette, Phường Nguyễn Thái Bình, Quận 1, Hồ Chí Minh",
+#       "ward": "Phường Nguyễn Thái Bình",
+#       "district": "Quận 1",
+#       "province": "Hồ Chí Minh",
+#       "Latitude": 10.76670092,
+#       "longtitude": 106.7000921,
+#       "Note": "Bán nhà Calmette 310m² - mặt tiền - ngang 13m - 4 tầng - Quận 1 - giá 385 tỷ",
+#       "Comparable_Property_Detail": {
+#         "Land_Area": 3100,
+#         "Building_Area": 0,
+#         "Frontage": 0,
+#         "Road_width": 0,
+#         "Floor_Count": 0,
+#         "Construction_year": 0,
+#         "Legal_status": "khác"
+#       },
+#       "Comparable_Transaction": {
+#         "Transaction_Price": 3850000000000,
+#         "Listing_Price": 0,
+#         "Price_Per_m2": 0,
+#         "Transaction_Date": "2026-05-10T17:00:00.000Z",
+#         "Distance_To_Subject": 0
+#       },
+#       "Advantages": {
+#         "Nearest_School": 217.9,
+#         "Nearest_Hospital": 280.5,
+#         "Nearest_Market": 229.9,
+#         "Nearest_Airport": 7502.3,
+#         "Nearest_Railway": 531,
+#         "Nearest_landfill": 6098.2,
+#         "Nearest_mall": 211.5,
+#         "Nearest_Pagoda": 187.3
+#       },
+#       "Comparable_Distances": [
+#         {
+#           "DistanceM": 779.1496734
+#         },
+#         {
+#           "DistanceM": 694.02279046
+#         }
+#       ]
+#     },
+#     {
+#       "Comparable_id": "117.47332999",
+#       "property_type": "Nhà mặt phố",
+#       "address": "Đường Hàm Nghi, Phường Nguyễn Thái Bình, Quận 1, Hồ Chí Minh",
+#       "ward": "Phường Nguyễn Thái Bình",
+#       "district": "Quận 1",
+#       "province": "Hồ Chí Minh",
+#       "Latitude": 10.77064839,
+#       "longtitude": 106.7026816,
+#       "Note": "Bán nhà mặt tiền 5 tầng Hàm Nghi , P. Nguyễn Thái Bình Quận 1 DT: 4x17m giá 66.5 tỷ",
+#       "Comparable_Property_Detail": {
+#         "Land_Area": 665,
+#         "Building_Area": 0,
+#         "Frontage": 500,
+#         "Road_width": 0,
+#         "Floor_Count": 50,
+#         "Construction_year": 0,
+#         "Legal_status": "sổ đỏ/sổ hồng"
+#       },
+#       "Comparable_Transaction": {
+#         "Transaction_Price": 665000000000,
+#         "Listing_Price": 0,
+#         "Price_Per_m2": 0,
+#         "Transaction_Date": "2026-04-30T17:00:00.000Z",
+#         "Distance_To_Subject": 0
+#       },
+#       "Advantages": {
+#         "Nearest_School": 100.2,
+#         "Nearest_Hospital": 380.5,
+#         "Nearest_Market": 148.2,
+#         "Nearest_Airport": 7367,
+#         "Nearest_Railway": 522.5,
+#         "Nearest_landfill": 5585.7,
+#         "Nearest_mall": 305.4,
+#         "Nearest_Pagoda": 168.4
+#       },
+#       "Comparable_Distances": [
+#         {
+#           "DistanceM": 425.75691882
+#         },
+#         {
+#           "DistanceM": 444.88592949
+#         }
+#       ]
+#     },
+#     {
+#       "Comparable_id": "117.47725432",
+#       "property_type": "Nhà mặt phố",
+#       "address": "Đường Lê Thánh Tôn, Phường Bến Nghé, Quận 1, Hồ Chí Minh",
+#       "ward": "Phường Bến Nghé",
+#       "district": "Quận 1",
+#       "province": "Hồ Chí Minh",
+#       "Latitude": 10.77628352,
+#       "longtitude": 106.7009708,
+#       "Note": "Chính chủ bán nhà MT Lê Thánh Tôn, P.Bến Nghé, Quận 1 ( 5.5x27.5m ) 7 Tầng mới. Giá 104 tỷ tl",
+#       "Comparable_Property_Detail": {
+#         "Land_Area": 1400,
+#         "Building_Area": 0,
+#         "Frontage": 55,
+#         "Road_width": 0,
+#         "Floor_Count": 0,
+#         "Construction_year": 0,
+#         "Legal_status": "sổ đỏ/sổ hồng"
+#       },
+#       "Comparable_Transaction": {
+#         "Transaction_Price": 1040000000000,
+#         "Listing_Price": 0,
+#         "Price_Per_m2": 0,
+#         "Transaction_Date": "2026-05-04T17:00:00.000Z",
+#         "Distance_To_Subject": 0
+#       },
+#       "Advantages": {
+#         "Nearest_School": 340.4,
+#         "Nearest_Hospital": 407.5,
+#         "Nearest_Market": 465.7,
+#         "Nearest_Airport": 6793.4,
+#         "Nearest_Railway": 162.2,
+#         "Nearest_landfill": 5082,
+#         "Nearest_mall": 299.7,
+#         "Nearest_Pagoda": 252.7
+#       },
+#       "Comparable_Distances": [
+#         {
+#           "DistanceM": 289.13371736
+#         },
+#         {
+#           "DistanceM": 411.98039233
+#         }
+#       ]
+#     },
+#     {
+#       "Comparable_id": "117.46017275",
+#       "property_type": "Nhà mặt phố",
+#       "address": "Đường Cô Bắc, Phường Cầu Ông Lãnh, Quận 1, Hồ Chí Minh",
+#       "ward": "Phường Cầu Ông Lãnh",
+#       "district": "Quận 1",
+#       "province": "Hồ Chí Minh",
+#       "Latitude": 10.76505805,
+#       "longtitude": 106.6951147,
+#       "Note": "Nhà mặt tiền ngang 4.3x16m đường Cô Bắc, Quận 1 giá chỉ 23 tỷ",
+#       "Comparable_Property_Detail": {
+#         "Land_Area": 660,
+#         "Building_Area": 0,
+#         "Frontage": 43,
+#         "Road_width": 0,
+#         "Floor_Count": 30,
+#         "Construction_year": 0,
+#         "Legal_status": "sổ đỏ/sổ hồng"
+#       },
+#       "Comparable_Transaction": {
+#         "Transaction_Price": 230000000000,
+#         "Listing_Price": 0,
+#         "Price_Per_m2": 0,
+#         "Transaction_Date": "2026-04-27T17:00:00.000Z",
+#         "Distance_To_Subject": 0
+#       },
+#       "Advantages": {
+#         "Nearest_School": 159.7,
+#         "Nearest_Hospital": 206.5,
+#         "Nearest_Market": 255.4,
+#         "Nearest_Airport": 7309.5,
+#         "Nearest_Railway": 722.3,
+#         "Nearest_landfill": 6485.7,
+#         "Nearest_mall": 369.4,
+#         "Nearest_Pagoda": 87.3
+#       },
+#       "Comparable_Distances": [
+#         {
+#           "DistanceM": 985.35941624
+#         }
+#       ]
+#     },
+#     {
+#       "Comparable_id": "117.46176141",
+#       "property_type": "Nhà riêng",
+#       "address": "Đường Lê Thị Riêng, Phường Bến Thành, Quận 1, Hồ Chí Minh",
+#       "ward": "Phường Bến Thành",
+#       "district": "Quận 1",
+#       "province": "Hồ Chí Minh",
+#       "Latitude": 10.77107471,
+#       "longtitude": 106.6906867,
+#       "Note": "Bán nhà ngay ngã 6 Phù Đổng Quận 1, ngang ~5m, 4 tầng 5 ngủ nhà mới đẹp ô tô đậu ở nhà 23tỷ",
+#       "Comparable_Property_Detail": {
+#         "Land_Area": 620,
+#         "Building_Area": 0,
+#         "Frontage": 49,
+#         "Road_width": 0,
+#         "Floor_Count": 40,
+#         "Construction_year": 0,
+#         "Legal_status": "sổ đỏ/sổ hồng"
+#       },
+#       "Comparable_Transaction": {
+#         "Transaction_Price": 230000000000,
+#         "Listing_Price": 0,
+#         "Price_Per_m2": 0,
+#         "Transaction_Date": "2026-05-10T17:00:00.000Z",
+#         "Distance_To_Subject": 0
+#       },
+#       "Advantages": {
+#         "Nearest_School": 40.1,
+#         "Nearest_Hospital": 43,
+#         "Nearest_Market": 448.6,
+#         "Nearest_Airport": 6483,
+#         "Nearest_Railway": 787.1,
+#         "Nearest_landfill": 6136.3,
+#         "Nearest_mall": 777.3,
+#         "Nearest_Pagoda": 311.3
+#       },
+#       "Comparable_Distances": [
+#         {
+#           "DistanceM": 967.53619014
+#         }
+#       ]
+#     }
+#   ],
+#   "Legal_Certificate": {},
+#   "Advantages": {
+#     "Nearest_School": 283.6,
+#     "Nearest_Hospital": 103.2,
+#     "Nearest_Market": 149.2,
+#     "Nearest_Airport": 6930.1,
+#     "Nearest_Railway": 271.6,
+#     "Nearest_landfill": 5496.1,
+#     "Nearest_mall": 137.9,
+#     "Nearest_Pagoda": 161.4
+#   },
+#   "land_area": 100,
+#   "frontage_width": 10,
+#   "LocationType": "Moi",
+#   "LandAreaTotal": 0,
+#   "FrontageWidth": 0
+# }
 
-#     "Advantages": {
-#         "Nearest_School": 43.7,
-#         "Nearest_Hospital": 100.4,
-#         "Nearest_Market": 380.8,
-#         "Nearest_Airport": 3597.1,
-#         "Nearest_Railway": 1153.2,
-#         "Nearest_landfill": 4033.1,
-#         "Nearest_Pagoda": 212.3
-#     }
-#     }
 #     #target = flatten_external_target(sample)
-#     result = calculate_benchmark(sample)
-#     print("Input:", json.dumps(sample, ensure_ascii=False, indent=2))
+#     result = calculate_P_by_f_score(sample)
+#     #print("Input:", json.dumps(sample, ensure_ascii=False, indent=2))
 #     print("\nOutput:")
 #     #print(result)
 #     print(json.dumps(result, ensure_ascii=False, indent=2))
