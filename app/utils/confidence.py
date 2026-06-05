@@ -240,8 +240,8 @@ def calculate_confidence(data: dict) -> dict:
     # 7. Warnings
     warns = warnings(n, avg_dist, avg_days, spread, k_nguon)
 
-    data["confidence"] = {
-        "asset_id":      data.get("PropertyId"),
+    return {
+        "PropertyId":      data.get("PropertyId"),
         "overall_score": round(cs, 2),
         "grade":         cs_grade,
         "meaning":       cs_meaning,
@@ -254,7 +254,7 @@ def calculate_confidence(data: dict) -> dict:
         },
         "warnings": warns,
     }
-    return data
+    
 
 
 # if __name__ == "__main__":
@@ -407,7 +407,7 @@ def calculate_confidence(data: dict) -> dict:
 #     }
 #     #target = flatten_external_target(sample)
 #     result = calculate_confidence(sample)
-#     print("Input:", json.dumps(sample, ensure_ascii=False, indent=2))
+#     #print("Input:", json.dumps(sample, ensure_ascii=False, indent=2))
 #     print("\nOutput:")
 #     #print(result)
 #     print(json.dumps(result, ensure_ascii=False, indent=2))
