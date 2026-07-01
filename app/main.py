@@ -1,6 +1,6 @@
 from fastapi import FastAPI
-from app.api.routes.ppss_route import router as ppss_router
-from app.api.routes.confidence_route import router as confidence_router
+from app.api.endpoints.valuation import router as ppss_router
+from app.api.endpoints.confidence import router as confidence_router
 
 app = FastAPI(title="Property Score API")
 
