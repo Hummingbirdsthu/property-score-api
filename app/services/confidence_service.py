@@ -127,7 +127,7 @@ class ConfidenceService:
         """
         Tính điểm tin cậy tổng thể (Confidence Score) cho kết quả định giá AVM.
         """
-        comps = data.Comparable_Assets
+        comps = data.ComparableAssets
         n = len(comps)
 
         # Lọc các TSSS có khoảng cách

@@ -95,7 +95,7 @@ class ValuationService:
         target_area = data.land_area
         
         # 2. Chấm điểm từng tài sản so sánh (Comparable) và tính đơn giá điều chỉnh P_tsmt
-        for comp_raw in data.Comparable_Assets:
+        for comp_raw in data.ComparableAssets:
             flat_comp = flatten_comparable_asset(comp_raw)
             f_comp = cls.calculate_f_score(flat_comp, rules)
             
@@ -127,7 +127,7 @@ class ValuationService:
         """
         Tính toán các chỉ số thống kê về đơn giá giao dịch của các tài sản so sánh.
         """
-        comps = data.Comparable_Assets
+        comps = data.ComparableAssets
         p_list = []
         
         for c in comps:

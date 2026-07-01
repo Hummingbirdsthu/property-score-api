@@ -43,7 +43,7 @@ class ValuationInputSchema(BaseModel):
     Advantages: Optional[Dict[str, Optional[float]]] = Field(default_factory=dict)
     land_area: Optional[float] = None
     frontage_width: Optional[float] = None
-    Comparable_Assets: List[ComparableAssetSchema] = Field(
+    ComparableAssets: List[ComparableAssetSchema] = Field(
         default_factory=list, 
         validation_alias=AliasChoices(
             "Comparable_Assets",

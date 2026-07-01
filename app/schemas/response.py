@@ -18,7 +18,7 @@ class ComparableAssetValuationSchema(BaseModel):
 
 class ComparePriceResponseSchema(BaseModel):
     target_asset: TargetAssetValuationSchema
-    Comparable_Assets: List[ComparableAssetValuationSchema]
+    ComparableAssets: List[ComparableAssetValuationSchema]
 
 class BenchmarkDetailSchema(BaseModel):
     average: int
