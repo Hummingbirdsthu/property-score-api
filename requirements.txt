@@ -3,5 +3,5 @@ uvicorn
 pydantic
 sqlalchemy
 pandas
-psycopg2
+psycopg2-binary==2.9.10
 geoalchemy2
